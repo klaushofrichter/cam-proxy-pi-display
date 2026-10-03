@@ -178,3 +178,17 @@ def test_without_dejavu_the_default_font_still_renders(monkeypatch, tmp_path):
     assert f.dir is None
     img = render("overview", view("ok"), NOW, f)
     assert img.size == (WIDTH, HEIGHT)
+
+
+def test_problems_come_from_the_flags_not_from_local_rules(fonts):
+    # cam-proxy decides what is a problem (e.g. FTP "not set up" while the proxy takes clips).
+    h = load_fixture("pi-ok")
+    ftp = next(i for i in h["items"] if i["id"] == "ftp")
+    ftp.update(value="not_set_up", text="not set up", problem=True)
+    h["ftp"]["cameraUpload"] = "not_set_up"
+    h.update(ok=False, problemCount=1)
+    v = View(Snapshot(h, None, FETCHED, LOCAL))
+    assert ("Camera FTP upload", "not set up", True) in compose("overview", v, NOW, fonts).lines
+    assert ("FTP", "not set up, clip 31 min ago", True) in compose("camera", v, NOW, fonts).lines
+    ftp.update(problem=False)
+    assert ("FTP", "not set up, clip 31 min ago", False) in compose("camera", v, NOW, fonts).lines
