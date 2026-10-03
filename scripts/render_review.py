@@ -3,8 +3,8 @@
 
     python3 scripts/render_review.py OUT_DIR [--scale 3] [--all]
 
---all renders every golden state instead of the review set. Needs the DejaVu fonts
-(fonts-dejavu-core, or CPPD_FONTS_DIR pointing at DejaVuSans.ttf and DejaVuSans-Bold.ttf).
+--all renders every golden state instead of the review set. Fonts: CPPD_FONTS_DIR, else
+.fonts/ (scripts/fetch-test-fonts.sh), else fonts-dejavu-core.
 """
 
 from __future__ import annotations
@@ -24,6 +24,11 @@ from tests.scenarios import GOLDEN, NOW, REVIEW, view  # noqa: E402
 
 
 def main() -> int:
+    import os
+
+    local_fonts = ROOT / ".fonts"
+    if "CPPD_FONTS_DIR" not in os.environ and (local_fonts / "DejaVuSans.ttf").is_file():
+        os.environ["CPPD_FONTS_DIR"] = str(local_fonts)
     ap = argparse.ArgumentParser()
     ap.add_argument("out", type=Path)
     ap.add_argument("--scale", type=int, default=3)

@@ -17,18 +17,13 @@ jobs:
         with:
           # Debian 13 (the Pi) ships Python 3.13.
           python-version: "3.13"
-      # The renderer's fonts, as on the Pi (fonts-dejavu-core).
-      - name: DejaVu fonts
-        run: |
-          if [ ! -f /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf ]; then
-            sudo rm -f /etc/apt/sources.list.d/google-chrome.list
-            sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-dejavu-core
-          fi
+      # The goldens are drawn with the Pi's DejaVu build (Debian 13 fonts-dejavu-core).
+      - run: scripts/fetch-test-fonts.sh
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest
-      - run: shellcheck deploy/*.sh
+      - run: shellcheck deploy/*.sh scripts/*.sh
       # A public repository: no LAN addresses or private host names.
       - name: No private addresses or host names
         run: |

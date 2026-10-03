@@ -31,12 +31,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
-      - name: DejaVu fonts
-        run: |
-          if [ ! -f /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf ]; then
-            sudo rm -f /etc/apt/sources.list.d/google-chrome.list
-            sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-dejavu-core
-          fi
+      - run: scripts/fetch-test-fonts.sh
       - run: pip install -r requirements-dev.txt
       - run: pytest
 

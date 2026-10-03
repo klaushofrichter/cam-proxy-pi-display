@@ -5,7 +5,7 @@ A Python service on the cam-proxy Raspberry Pi that draws cam-proxy's health on 
 ## Commands
 
 - `python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt` (dev only).
-- `.venv/bin/pytest` (needs DejaVu fonts: `fonts-dejavu-core` or `CPPD_FONTS_DIR`), `.venv/bin/ruff check . && .venv/bin/ruff format --check .`, `shellcheck deploy/*.sh`.
+- `scripts/fetch-test-fonts.sh` once (Debian's DejaVu build into `.fonts/`, as on the Pi), then `.venv/bin/pytest`, `.venv/bin/ruff check . && .venv/bin/ruff format --check .`, `shellcheck deploy/*.sh`.
 - `UPDATE_GOLDEN=1 .venv/bin/pytest tests/test_render.py` after an intended layout change; `scripts/render_review.py OUT --scale 3` renders the review set.
 - `python3 -m cam_proxy_pi_display --fake-panel DIR [--once PAGE] [--health-file FILE]`: PNGs instead of the panel.
 

@@ -181,6 +181,7 @@ On a Mac or in CI, `--fake-panel DIR` writes PNGs instead of driving the panel, 
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+scripts/fetch-test-fonts.sh
 .venv/bin/python -m cam_proxy_pi_display --fake-panel out --once overview \
     --health-file tests/fixtures/pi-ok.json
 .venv/bin/python -m cam_proxy_pi_display --fake-panel out --config my.toml   # the service, against a cam-proxy
@@ -190,8 +191,10 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
   figures, the refresh policy on a fake clock (blips, coalescing, the hourly cap, the
   daily clear), keys (logic and gpiozero's mock pins), the service loop, the CLI, and
   **golden images** of every page in OK and problem states (`tests/golden/`).
-- The tests need the DejaVu fonts: `fonts-dejavu-core`, or `CPPD_FONTS_DIR` pointing at
-  a directory with `DejaVuSans.ttf` and `DejaVuSans-Bold.ttf`.
+- The tests need the DejaVu fonts as the Pi has them: `scripts/fetch-test-fonts.sh` puts
+  the two files from Debian 13's `fonts-dejavu-core` (pinned by checksum) into `.fonts/`,
+  where the tests find them. Debian builds these fonts from source, so other builds move
+  pixels in the golden images.
 - After an intended layout change: `UPDATE_GOLDEN=1 pytest tests/test_render.py`, then
   look at the images. `scripts/render_review.py OUT --scale 3` renders the review set
   scaled up for reading on a screen.
