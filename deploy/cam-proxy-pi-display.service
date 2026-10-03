@@ -1,0 +1,51 @@
+# cam-proxy-pi-display: cam-proxy's health on the Waveshare 2.7" e-Paper HAT.
+# Installed by deploy/install.sh as /etc/systemd/system/cam-proxy-pi-display.service.
+[Unit]
+Description=cam-proxy health on the e-paper display
+Documentation=https://github.com/klaushofrichter/cam-proxy-pi-display
+# Not tied to Docker: the display keeps working (and says "proxy unreachable")
+# while the cam-proxy container is down.
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=campdisplay
+Group=campdisplay
+SupplementaryGroups=spi gpio
+Environment=PYTHONPATH=/opt/cam-proxy-pi-display
+Environment=PYTHONUNBUFFERED=1
+# lgpio keeps its notification pipes in the working directory (or LG_WD).
+RuntimeDirectory=cam-proxy-pi-display
+WorkingDirectory=/run/cam-proxy-pi-display
+Environment=LG_WD=/run/cam-proxy-pi-display
+ExecStart=/usr/bin/python3 -m cam_proxy_pi_display --config /etc/cam-proxy-pi-display.toml
+Restart=on-failure
+RestartSec=30
+# SIGTERM draws the "Display stopped" page: init + draw + sleep take about 5 s.
+TimeoutStopSec=60
+
+# Hardening. Nothing here hides /dev/spidev* or /dev/gpiochip* (no PrivateDevices,
+# no DevicePolicy): access to them comes from the spi and gpio groups.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+# Loopback HTTP to the proxy, and the IP address lookup (an AF_INET ioctl).
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

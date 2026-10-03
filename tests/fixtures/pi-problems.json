@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "generatedAt": 1791041100000,
+  "version": "2026.10.03.2",
+  "startedAt": 1791034655742,
+  "ok": false,
+  "problemCount": 5,
+  "thresholds": {
+    "diskPercent": 90,
+    "tempC": 75,
+    "ftpStalledHours": 6
+  },
+  "platform": {
+    "pi": true,
+    "model": "Raspberry Pi 4 Model B Rev 1.5",
+    "hostStats": true
+  },
+  "items": [
+    {
+      "id": "camera",
+      "label": "Camera",
+      "value": false,
+      "text": "offline",
+      "problem": true
+    },
+    {
+      "id": "stream",
+      "label": "Live stream",
+      "value": "down",
+      "text": "down",
+      "problem": true
+    },
+    {
+      "id": "events",
+      "label": "Events intake",
+      "value": "down",
+      "text": "down, polling",
+      "problem": true
+    },
+    {
+      "id": "ftp",
+      "label": "Camera FTP upload",
+      "value": "on",
+      "text": "on",
+      "problem": false
+    },
+    {
+      "id": "storage",
+      "label": "Storage",
+      "value": "writing",
+      "text": "writing",
+      "problem": false
+    },
+    {
+      "id": "disk",
+      "label": "Disk",
+      "value": 93.1,
+      "text": "93.1 % of 228.6 GB",
+      "problem": true
+    },
+    {
+      "id": "cpuTemp",
+      "label": "CPU temperature",
+      "value": 78.2,
+      "text": "78.2 °C",
+      "problem": true
+    },
+    {
+      "id": "underVoltage",
+      "label": "Under-voltage",
+      "value": false,
+      "text": "no",
+      "problem": false
+    },
+    {
+      "id": "inventory",
+      "label": "Last inventory",
+      "value": "ok",
+      "text": "clips: ok",
+      "problem": false
+    },
+    {
+      "id": "version",
+      "label": "Version",
+      "value": "2026.10.03.2",
+      "text": "2026.10.03.2",
+      "problem": false
+    }
+  ],
+  "camera": {
+    "id": "cam1",
+    "name": "Yard",
+    "address": "192.0.2.10",
+    "online": false,
+    "since": 1791040380000,
+    "model": "RLC-1224A",
+    "firmware": "v3.1.0.4054_2409213180",
+    "clockOffsetMs": -412,
+    "error": "timeout",
+    "reboot": null,
+    "poeSwitch": {
+      "model": "sscpoe-web",
+      "port": 8
+    }
+  },
+  "stream": {
+    "enabled": true,
+    "up": false,
+    "lastFrameAt": 1791040370000
+  },
+  "events": {
+    "onvif": "down",
+    "source": "poll",
+    "since": 1791040390000,
+    "resubscribes": 3
+  },
+  "ftp": {
+    "enabled": true,
+    "listening": true,
+    "cameraUpload": "on",
+    "checkedAt": 1791040980000,
+    "lastClipAt": 1791039210000,
+    "clipsStored": 412,
+    "failures": 0,
+    "stalled": false,
+    "eventsWithoutClip": 0
+  },
+  "proxy": {
+    "sseClients": 2,
+    "storagePaused": false,
+    "lastRetentionRun": 1791038400000,
+    "recordingsCache": {
+      "bytes": 734003200,
+      "files": 6,
+      "capBytes": 2147483648
+    },
+    "lastInventory": {
+      "kind": "clips",
+      "op": "check",
+      "outcome": "ok",
+      "startedAt": 1791030000000,
+      "message": "Clips check: nothing missing"
+    }
+  },
+  "disk": {
+    "sizeBytes": 245457289216,
+    "freeBytes": 16904340480,
+    "usedBytes": 228552948736,
+    "usedPercent": 93.1
+  },
+  "host": {
+    "cpuTempC": 78.2,
+    "underVoltage": false,
+    "memory": {
+      "totalBytes": 4025016320,
+      "availableBytes": 3435134976,
+      "usedPercent": 14.7
+    },
+    "uptimeS": 412233,
+    "load": {
+      "m1": 0.42,
+      "m5": 0.38,
+      "m15": 0.35
+    }
+  }
+}

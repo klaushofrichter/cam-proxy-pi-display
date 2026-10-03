@@ -1,0 +1,7 @@
+# Development and CI only. On the Pi the service uses Debian's packages
+# (python3-pil, python3-gpiozero, python3-lgpio, python3-spidev); nothing is
+# installed with pip there.
+pillow==12.3.0
+gpiozero==2.0.1.post3
+pytest==9.1.1
+ruff==0.16.10
