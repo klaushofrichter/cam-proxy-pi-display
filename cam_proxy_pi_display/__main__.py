@@ -80,7 +80,9 @@ def once(args, cfg, fonts) -> int:
 def time_now(t: float):
     from datetime import datetime
 
-    return datetime.fromtimestamp(t).astimezone()
+    from .fmt import system_tz
+
+    return datetime.fromtimestamp(t, system_tz())
 
 
 def main(argv=None) -> int:

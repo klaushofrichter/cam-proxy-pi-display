@@ -41,6 +41,8 @@ def view(name: str) -> View:
         return View(snap("cluster", local={}))
     if name == "unreachable":
         return View(snap(None, error="connection refused"), last_ok=snap("pi-ok", at=FETCHED - 240))
+    if name == "unreachable-yesterday":  # last answer Fri 18:02, read Sat 10:25
+        return View(snap(None, error="timeout"), last_ok=snap("pi-ok", at=FETCHED - (16 * 60 + 23) * 60))
     if name == "unreachable-cold":  # never answered since the start
         return View(snap(None, error="timeout"))
     if name == "changing-often":
@@ -55,6 +57,7 @@ GOLDEN = [
     ("overview-cluster", "overview", "cluster"),
     ("overview-unreachable", "overview", "unreachable"),
     ("overview-changing-often", "overview", "changing-often"),
+    ("overview-unreachable-yesterday", "overview", "unreachable-yesterday"),
     ("camera-ok", "camera", "ok"),
     ("camera-problems", "camera", "problems"),
     ("camera-cluster", "camera", "cluster"),
@@ -79,6 +82,7 @@ REVIEW = [
     ("proxy", "proxy", "ok"),
     ("pi", "pi", "ok"),
     ("proxy-unreachable", "overview", "unreachable"),
+    ("proxy-unreachable-yesterday", "overview", "unreachable-yesterday"),
     ("changing-often", "overview", "changing-often"),
     ("stopped", "stopped", "ok"),
 ]
