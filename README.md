@@ -34,18 +34,21 @@ cam-proxy does not depend on this service; this service keeps running (and says
 
 ## Pages
 
-Every page has a header with the page name and **"updated HH:MM"**. Problem lines are
+Every page has a header with the page name and **"updated Sat Oct 3 10:25"**: the screen
+may be read a day or more after it was drawn, so every time on the display carries its
+full date (weekday, month, day, 24 h time, local time zone). Problem lines are
 inverted (white on black), matching the red lines on cam-proxy's Status page. A figure
 the API reports as `null` is left off.
 
 | Page | Shows |
 |---|---|
 | **Overview** (resting page) | The API's `items` as given (camera, live stream, events intake, camera FTP upload, storage, disk with a bar, CPU temperature, under-voltage, last inventory, version), then "All OK" or "N problems" (and "changing often", see below). When the proxy can't be reached: "Proxy unreachable", the reason, the time of the last data, and the Pi's own disk, CPU temperature, uptime and IP address. |
-| **Camera** | Online state and since when, model, firmware, address, clock offset; stream and the age of the last frame; ONVIF events state and resubscribes; camera FTP state and the last clip; the FTP stall check; the PoE switch port. |
-| **Proxy** | **The installed proxy version first, in full** (or "unreachable"); up since; clips stored; FTP failures; storage writing or paused; recordings cache fill; viewers (SSE clients); last retention run; last inventory. |
+| **Camera** | Online state and since when, model, firmware, address and clock offset; stream and the time of the last frame; ONVIF events state and resubscribes; camera FTP state and the time of the last clip; the FTP stall check; the PoE switch port. |
+| **Proxy** | **The installed proxy version first, in full** (or "unreachable"); up since; clips stored; FTP failures; storage writing or paused; recordings cache fill; viewers (SSE clients); last retention run; last inventory and when it ran. |
 | **Pi** | Model, disk bar, free GB, CPU temperature, memory, uptime, load, under-voltage, IP address. Works without the proxy: disk, temperature and uptime are read directly. |
 
-On a normal stop (systemd) the service draws a last page, **"Display stopped HH:MM"**.
+On a normal stop (systemd) the service draws a last page, **"Display stopped"** with its
+date and time, and the time of the last data.
 
 ## Keys
 
