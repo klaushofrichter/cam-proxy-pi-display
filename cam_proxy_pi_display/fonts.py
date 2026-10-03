@@ -42,5 +42,7 @@ class Fonts:
     @lru_cache(maxsize=16)  # noqa: B019 (one Fonts per process)
     def get(self, weight: str, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         if self.dir is not None:
-            return ImageFont.truetype(str(self.dir / FILES[weight]), size)
+            # BASIC layout, not Raqm: Raqm is used whenever libraqm happens to be installed,
+            # and it places glyphs differently, so the same page would differ between hosts.
+            return ImageFont.truetype(str(self.dir / FILES[weight]), size, layout_engine=ImageFont.Layout.BASIC)
         return ImageFont.load_default(size)
