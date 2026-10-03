@@ -1,0 +1,13 @@
+cam-proxy-pi-display
+Copyright (c) 2026 Klaus Hofrichter, MIT License (see LICENSE).
+
+This repository includes third-party code:
+
+cam_proxy_pi_display/vendor/waveshare_epd/epd2in7.py
+cam_proxy_pi_display/vendor/waveshare_epd/epdconfig.py
+  The Waveshare e-Paper driver for the 2.7 inch HAT (V1) and its hardware
+  interface, copied unchanged from https://github.com/waveshareteam/e-Paper,
+  commit a794fbc39656b0f93938d1ffb3fdc77eaed9e9fc
+  (RaspberryPi_JetsonNano/python/lib/waveshare_epd/).
+  Copyright (c) Waveshare team, MIT License: the permission notice is kept at
+  the top of each file.

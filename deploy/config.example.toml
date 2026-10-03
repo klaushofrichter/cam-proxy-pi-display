@@ -1,0 +1,27 @@
+# /etc/cam-proxy-pi-display.toml: every setting is optional; these are the defaults.
+# After a change: sudo systemctl restart cam-proxy-pi-display
+
+[api]
+# cam-proxy's local health API. It answers only on loopback (no key).
+url = "http://127.0.0.1:8480/api/local/health"
+timeout_s = 5
+poll_interval_s = 60
+
+[keys]
+# BCM GPIO numbers of the four keys, top to bottom with the keys on the left
+# (landscape). The bottom key is Update (short) / Overview (long press).
+pins = [5, 6, 13, 19]
+long_press_s = 2.0
+bounce_s = 0.05
+
+[refresh]
+timer_min = 15                # redraw the page shown
+return_to_overview_min = 10   # after a key press
+problem_confirm_polls = 2     # a problem change must hold this many polls
+problem_min_interval_min = 5  # between problem redraws
+problem_max_per_hour = 6      # then only the timer, and "changing often"
+daily_clear = "03:30"         # full clear against ghosting (local time)
+
+[display]
+# Empty: /usr/share/fonts/truetype/dejavu (fonts-dejavu-core).
+fonts_dir = ""

@@ -1,0 +1,20 @@
+[project]
+name = "cam-proxy-pi-display"
+description = "cam-proxy's health on a Waveshare 2.7 inch e-Paper HAT (V1) on the Raspberry Pi"
+requires-python = ">=3.13"
+license = "MIT"
+# Not installed with pip: on the Pi it runs from /opt/cam-proxy-pi-display with
+# Debian's python3-pil, python3-gpiozero, python3-lgpio and python3-spidev.
+dynamic = ["version"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["cam_proxy_pi_display/vendor"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]

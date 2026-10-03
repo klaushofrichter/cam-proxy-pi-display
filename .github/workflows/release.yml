@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One release at a time: two promotions close together would compute the same version.
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to release anything but production
+        if: github.ref != 'refs/heads/production'
+        run: |
+          echo "::error::releases run from production only (got ${GITHUB_REF})"
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # What the PR checks ran, once more on the exact commit that is released.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - run: scripts/fetch-test-fonts.sh
+      - run: pip install -r requirements-dev.txt
+      - run: pytest
+
+      - name: Generate the version
+        id: ver
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DATE=$(TZ=America/Chicago date +%Y.%m.%d)
+          # Own assignment so a gh failure fails the step instead of reading as
+          # "no releases today" and reusing a shipped version.
+          RELEASES=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName -q '.[].tagName')
+          TODAY=$(printf '%s\n' "$RELEASES" | grep -c "^v${DATE}\." || true)
+          VERSION="${DATE}.$((TODAY + 1))"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$VERSION"
+
+      # The release is the tag plus GitHub's source archive; deploy/update.sh on the
+      # Pi downloads that archive. Nothing is deployed from here.
+      - name: Tag the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$TAG already released - skipping."; exit 0
+          fi
+          : > /tmp/notes.md
+          awk '/^## \[?Unreleased\]?/ { grab = 1; next } grab && /^## / { exit } grab { print }' CHANGELOG.md \
+            | sed '/^[[:space:]]*$/d' > /tmp/curated.md
+          if [ -s /tmp/curated.md ]; then cat /tmp/curated.md >> /tmp/notes.md; printf '\n' >> /tmp/notes.md; fi
+          PREV=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || true)
+          printf '### Changes\n\n' >> /tmp/notes.md
+          if [ -n "$PREV" ] && git rev-parse "$PREV" >/dev/null 2>&1; then
+            git log --no-merges --pretty='- %s' "${PREV}..HEAD" >> /tmp/notes.md
+            printf '\n**Full diff:** https://github.com/%s/compare/%s...%s\n' "$GITHUB_REPOSITORY" "$PREV" "$TAG" >> /tmp/notes.md
+          else
+            git log --no-merges --pretty='- %s' -30 >> /tmp/notes.md
+          fi
+          {
+            printf '\n### Install or update on the Pi\n\n'
+            printf '    sudo /opt/cam-proxy-pi-display/deploy/update.sh %s\n' "$TAG"
+          } >> /tmp/notes.md
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --notes-file /tmp/notes.md
+          echo "Released $TAG"
