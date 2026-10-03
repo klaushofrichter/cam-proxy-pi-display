@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable
 from datetime import datetime, tzinfo
 
-from . import localstats
+from . import fmt, localstats
 from .collector import Snapshot, fetch_health, problem_set
 from .config import Config
 from .fonts import Fonts
@@ -45,6 +45,7 @@ class Service:
         self.local = local
         self.clock = clock
         self.tz = tz  # None: the system's zone
+        self._system_tz = fmt.system_tz()
         self.q: queue.Queue[str] = queue.Queue()
         self.stopping = threading.Event()
         now = clock()
@@ -56,9 +57,8 @@ class Service:
     # --- time -----------------------------------------------------------------------
 
     def local_time(self, t: float) -> datetime:
-        if self.tz is not None:
-            return datetime.fromtimestamp(t, self.tz)
-        return datetime.fromtimestamp(t).astimezone()
+        # The zone with its DST rules, so older timestamps get their own offset.
+        return datetime.fromtimestamp(t, self.tz or self._system_tz)
 
     # --- inputs ------------------------------------------------------------------------
 

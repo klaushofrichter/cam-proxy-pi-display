@@ -41,7 +41,8 @@ class Canvas:
         self.img = Image.new("1", (WIDTH, HEIGHT), WHITE)
         self.d = ImageDraw.Draw(self.img)
         self.y = HEADER_H + 2
-        self.lines: list[tuple[str, str, bool]] = []  # (label, text, problem) as drawn, for the tests
+        self.lines: list[tuple[str, str, bool]] = []
+        self.header_title_drawn = ""  # (label, text, problem) as drawn, for the tests
         self.regular = fonts.get("regular", 12)
         self.bold = fonts.get("bold", 12)
 
@@ -62,9 +63,10 @@ class Canvas:
         right_w = self.width(right, small)
         self.d.text((WIDTH - MARGIN, 13), right, font=small, fill=WHITE, anchor="rs")
         title_font = self.fonts.get("bold", 13)
+        self.header_title_drawn = self.fit(title, title_font, WIDTH - 3 * MARGIN - right_w)
         self.d.text(
             (MARGIN, 13),
-            self.fit(title, title_font, WIDTH - 3 * MARGIN - right_w),
+            self.header_title_drawn,
             font=title_font,
             fill=WHITE,
             anchor="ls",
@@ -146,11 +148,13 @@ def _thresholds(view: View) -> dict:
     return t
 
 
+def _at(ms: int | float, now: datetime) -> str:
+    """A timestamp on a page: always the full date ("Sat Oct 3 10:25"), in now's zone."""
+    return fmt.stamp(ms, now.tzinfo)
+
+
 def _updated(view: View, now: datetime) -> str:
-    t = datetime.fromtimestamp(view.snap.fetched_at, now.tzinfo)
-    if t.date() == now.date():
-        return f"updated {fmt.hhmm(t)}"
-    return f"updated {fmt.clock(view.snap.fetched_at * 1000, now)}"
+    return f"updated {_at(view.snap.fetched_at * 1000, now)}"
 
 
 def _summary(c: Canvas, n: int, changing_often: bool) -> None:
@@ -194,7 +198,7 @@ def _unreachable_block(c: Canvas, view: View, now: datetime) -> None:
     c.big("Proxy unreachable", problem=True)
     c.row("Reason", view.snap.error or "no answer", col=96)
     if view.last_ok is not None:
-        c.row("Last data", fmt.clock(view.last_ok.fetched_at * 1000, now), col=96)
+        c.row("Last data", _at(view.last_ok.fetched_at * 1000, now), col=96)
 
 
 def _local_rows(c: Canvas, view: View, col: int) -> None:
@@ -236,23 +240,24 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
     state = str(cam_item.get("text", "online" if cam.get("online") else "offline"))
     if not cam.get("online") and cam.get("error"):
         state += f" ({cam['error']})"
-    if _num(cam.get("since")):
-        state += f" since {fmt.clock(cam['since'], now)}"
     name = str(cam.get("name") or cam.get("id") or "Camera")
     c.row(name, state, problem=cam_item.get("problem") is True, col=col)
+    if _num(cam.get("since")):
+        c.row("Since", _at(cam["since"], now), col=col)
     if cam.get("model"):
         c.row("Model", str(cam["model"]), col=col)
     if cam.get("firmware"):
         c.row("Firmware", str(cam["firmware"]), col=col)
-    if cam.get("address"):
-        c.row("Address", str(cam["address"]), col=col)
+    address = str(cam.get("address") or "")
     if _num(cam.get("clockOffsetMs")):
-        c.row("Clock", f"{fmt.offset_ms(int(cam['clockOffsetMs']))} off", col=col)
+        address += (", " if address else "") + f"clock {fmt.offset_ms(int(cam['clockOffsetMs']))}"
+    if address:
+        c.row("Address", address, col=col)
 
     st_item = it.get("stream", {})
     st = str(st_item.get("text", ""))
     if stream.get("enabled") and _num(stream.get("lastFrameAt")):
-        st += f", frame {fmt.ago(stream['lastFrameAt'], now)}"
+        st += f", frame {_at(stream['lastFrameAt'], now)}"
     c.row("Stream", st, problem=st_item.get("problem") is True, col=col)
 
     ev_item = it.get("events", {})
@@ -269,9 +274,9 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
     else:
         upload = ftp.get("cameraUpload")
         text = str(ftp_item.get("text", "")) if not stalled else (str(upload) if upload else "")
-        if _num(ftp.get("lastClipAt")):
-            text += (", " if text else "") + f"clip {fmt.ago(ftp['lastClipAt'], now)}"
         c.row("FTP", text, problem=ftp_item.get("problem") is True and not stalled, col=col)
+        if _num(ftp.get("lastClipAt")):
+            c.row("Last clip", _at(ftp["lastClipAt"], now), col=col)
         if stalled:
             n = ftp.get("eventsWithoutClip")
             hours = (h.get("thresholds") or {}).get("ftpStalledHours")
@@ -292,23 +297,19 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
 
 def _proxy(c: Canvas, view: View, now: datetime) -> None:
     h = view.snap.health
-    col = 96
+    col = 102
     if h is None:
         c.row("Version", "unreachable", problem=True, bold=True, col=col)
         c.row("Reason", view.snap.error or "no answer", col=col)
         if view.last_ok is not None:
-            c.row("Last data", fmt.clock(view.last_ok.fetched_at * 1000, now), col=col)
+            c.row("Last data", _at(view.last_ok.fetched_at * 1000, now), col=col)
         return
     it = _items(h)
     proxy = h.get("proxy") or {}
     ftp = h.get("ftp") or {}
     c.row("Version", str(h.get("version", "?")), bold=True, col=col)
     if _num(h.get("startedAt")):
-        c.row(
-            "Up since",
-            f"{fmt.clock(h['startedAt'], now)}, {fmt.duration(now.timestamp() - h['startedAt'] / 1000)}",
-            col=col,
-        )
+        c.row("Up since", _at(h["startedAt"], now), col=col)
     if _num(ftp.get("clipsStored")):
         c.row("Clips stored", str(int(ftp["clipsStored"])), col=col)
     if _num(ftp.get("failures")):
@@ -326,14 +327,13 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
     if _num(proxy.get("sseClients")):
         c.row("Viewers", str(int(proxy["sseClients"])), col=col)
     if _num(proxy.get("lastRetentionRun")):
-        c.row("Retention", f"last run {fmt.clock(proxy['lastRetentionRun'], now)}", col=col)
+        c.row("Retention run", _at(proxy["lastRetentionRun"], now), col=col)
     inv = it.get("inventory")
     if inv:
-        text = str(inv.get("text", ""))
+        c.row("Inventory", str(inv.get("text", "")), problem=inv.get("problem") is True, col=col)
         last = proxy.get("lastInventory")
         if isinstance(last, dict) and _num(last.get("startedAt")):
-            text += f" ({fmt.clock(last['startedAt'], now)})"
-        c.row("Inventory", text, problem=inv.get("problem") is True, col=col)
+            c.row("Inventory run", _at(last["startedAt"], now), col=col)
 
 
 def _pi(c: Canvas, view: View, now: datetime) -> None:
@@ -388,9 +388,10 @@ def _pi(c: Canvas, view: View, now: datetime) -> None:
 
 
 def _stopped(c: Canvas, view: View, now: datetime) -> None:
-    c.gap(14)
-    c.big(f"Display stopped {fmt.hhmm(now)}", size=17)
-    c.gap(6)
+    c.gap(8)
+    c.big("Display stopped", size=17)
+    c.big(fmt.stamp(now), size=17)
+    c.gap(4)
     c.row("This screen is no longer updated.")
     c.row("The service cam-proxy-pi-display")
     c.row("is not running.")
@@ -398,7 +399,7 @@ def _stopped(c: Canvas, view: View, now: datetime) -> None:
     if snap is not None and snap.health is not None:
         n = snap.health.get("problemCount", 0)
         state = "All OK" if not n else f"{n} problem" + ("" if n == 1 else "s")
-        c.footer(f"Last data {fmt.clock(snap.fetched_at * 1000, now)}: {state}", bold=False)
+        c.footer(f"Last data {_at(snap.fetched_at * 1000, now)}: {state}", bold=False)
     elif view.snap.health is None:
         c.footer("Last data: proxy unreachable", bold=False)
 
@@ -415,7 +416,7 @@ def compose(page: str, view: View, now: datetime, fonts: Fonts) -> Canvas:
         raise ValueError(f"unknown page {page!r}")
     c = Canvas(fonts)
     if page == "stopped":
-        c.header(TITLES[page], fmt.hhmm(now))
+        c.header(TITLES[page], fmt.stamp(now))
     else:
         c.header(TITLES[page], _updated(view, now))
     RENDERERS[page](c, view, now)

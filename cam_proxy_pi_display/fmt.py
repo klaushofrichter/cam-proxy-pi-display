@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, tzinfo
+from zoneinfo import ZoneInfo
 
 GIB = 1024**3
 MIB = 1024**2
+DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 
@@ -13,12 +15,24 @@ def hhmm(t: datetime) -> str:
     return f"{t.hour:02d}:{t.minute:02d}"
 
 
-def clock(ms: int | float, now: datetime) -> str:
-    """'08:31' today, else '2 Oct 08:31' (in now's time zone)."""
-    t = datetime.fromtimestamp(ms / 1000, now.tzinfo)
-    if t.date() == now.date():
-        return hhmm(t)
-    return f"{t.day} {MONTHS[t.month - 1]} {hhmm(t)}"
+def stamp(t: int | float | datetime, tz: tzinfo | None = None) -> str:
+    """The full local date and time, 'Sat Oct 3 10:25' (English names, 24 h).
+
+    `t` is unix milliseconds (shown in `tz`) or an aware datetime (shown as it is).
+    The screen may be read a day or more after it was drawn, so every time carries its date.
+    """
+    if not isinstance(t, datetime):
+        t = datetime.fromtimestamp(t / 1000, tz or system_tz())
+    return f"{DAYS[t.weekday()]} {MONTHS[t.month - 1]} {t.day} {hhmm(t)}"
+
+
+def system_tz() -> tzinfo:
+    """The system's zone with its DST rules (/etc/localtime), else the current offset."""
+    try:
+        with open("/etc/localtime", "rb") as f:
+            return ZoneInfo.from_file(f)
+    except (OSError, ValueError):
+        return datetime.now().astimezone().tzinfo
 
 
 def duration(seconds: float) -> str:
@@ -34,10 +48,6 @@ def duration(seconds: float) -> str:
         return f"{h} h {m} min" if m else f"{h} h"
     d, h = divmod(h, 24)
     return f"{d} d {h} h" if h else f"{d} d"
-
-
-def ago(ms: int | float, now: datetime) -> str:
-    return duration(now.timestamp() - ms / 1000) + " ago"
 
 
 def gb(n: int | float) -> str:
