@@ -1,0 +1,48 @@
+version: 2
+
+# Version updates. Note these are only half the story: the security half
+# (Dependabot alerts + security updates) is a repo setting, not config, and
+# both must stay switched on under Settings > Code security.
+#
+# PRs land on main, which is unprotected, and reach production through the
+# normal main -> production promotion. Nothing here deploys on its own.
+updates:
+  # Development and CI dependencies (requirements-dev.txt). The Pi itself uses
+  # Debian's packages. A Pillow bump can move a few pixels in the golden images:
+  # look at them before regenerating.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Chicago
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: deps-dev
+    groups:
+      dev-dependencies:
+        update-types:
+          - minor
+          - patch
+    # Majors stay ungrouped and arrive one at a time.
+
+  # Workflow actions.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Chicago
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - "*"
