@@ -24,3 +24,13 @@ A Python service on the cam-proxy Raspberry Pi that draws cam-proxy's health on 
 - Release: PR `main` → `production`, merge; `.github/workflows/release.yml` tests the commit, tags `vYYYY.MM.DD.N` (America/Chicago) and writes notes from `## Unreleased`. No version in the sources (`VERSION` is written at install).
 - Put user-visible changes under `## Unreleased` in CHANGELOG.md. The release does not clear it: after a release, move the entries under `## vYYYY.MM.DD.N` in a small PR (pull main first).
 - Merge only when all checks pass (JSON check of `gh pr checks`, non-empty, all `pass`). Stage files explicitly.
+
+## Repository baseline: what applies, and the exceptions
+
+kube-setup's `docs/repository-baseline.md` applies; `docs/cluster-deployment-requirements.md` does not (nothing here deploys into the cluster). Checked 2026-10-03:
+
+- Met: Dependabot alerts and security updates on, `.github/dependabot.yml` (pip + github-actions), labels `dependencies` and `ci`; badge row (release, PR checks, release workflow on `production`, Dependabot); one Python (3.13 in CI, `requires-python`, ruff `py313`); `production` protected (`test`, `codeql`, strict, enforce_admins off).
+- Exception, no image or deploy badge and no docker ecosystem: there is no container image and no deploy pipeline. A release is a tag and its source archive, installed by hand with `update.sh`.
+- Exception, no audit step in `test`: the Pi runs Debian's packages (python3-pil, python3-gpiozero, …), which apt updates; `requirements-dev.txt` holds CI and dev tools only, watched by Dependabot alerts. A `pip-audit` step would check packages the Pi never runs.
+- Exception, no `e2e` check: there is no browser surface. The golden images of every page are the end-to-end check of what the panel shows.
+- Exception, no "Verified at release": nothing is deployed when a release is cut, so there is nothing to observe.
