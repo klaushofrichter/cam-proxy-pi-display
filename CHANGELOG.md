@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2026.10.03.2
+
 - Every time on the display carries its full date, as the screen may be read a day or more after it was drawn: the header says "updated Sat Oct 3 10:25", and online since, last frame, last clip, last data, up since, retention run and inventory run use the same format (local time, with each timestamp's own DST offset). The stopped page shows "Display stopped" with the date and time. The Camera page has "Since" and "Last clip" lines, and the clock offset next to the address; the Proxy page has "Inventory run".
 
 ## v2026.10.03.1

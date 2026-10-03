@@ -6,10 +6,13 @@
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](https://github.com/klaushofrichter/cam-proxy-pi-display/security/dependabot)
 
 <!-- The release badge is the newest tag, which the release workflow cuts from
-     production. Dependabot is a static badge (it has no status endpoint);
-     alerts and security updates are on in the repository settings, version
-     updates come from .github/dependabot.yml. No version numbers in the text
-     below: they go stale; the badge and the releases page carry them. -->
+     production. There is no image-build or deploy badge: this service builds
+     no container image and has no deploy pipeline. A release is a tag plus
+     GitHub's source archive, installed on the Pi by hand (see Install).
+     Dependabot is a static badge (it has no status endpoint); alerts and
+     security updates are on in the repository settings, version updates come
+     from .github/dependabot.yml. No version numbers in the text below: they
+     go stale; the badge and the releases page carry them. -->
 
 A small always-on status display for [cam-proxy](https://github.com/klaushofrichter/cam-proxy)
 on a Raspberry Pi: a Python service that draws cam-proxy's health on a Waveshare
@@ -21,6 +24,16 @@ which answers on loopback only and carries no secrets. Everything on the display
 also on cam-proxy's Status page, with the same thresholds, so the two never disagree.
 cam-proxy does not depend on this service; this service keeps running (and says
 "proxy unreachable") when cam-proxy is down.
+
+## Related repos
+
+- [cam-proxy](https://github.com/klaushofrichter/cam-proxy): the camera gateway on the
+  same Pi. This service reads its `GET /api/local/health` and nothing else.
+- [cams](https://github.com/klaushofrichter/cams): the web viewer for the cameras. It
+  reads cam-proxy's client API; it doesn't talk to this service.
+- [cam-sim](https://github.com/klaushofrichter/cam-sim): the camera simulator, which
+  stands in for the camera in cams' and cam-proxy's tests and as `cam2` in the cluster.
+  This service's tests use sample health answers instead (`tests/fixtures/`).
 
 ## Hardware
 
@@ -114,12 +127,15 @@ is hardened (read-only system, no capabilities, no new privileges) without hidin
 
 ## Update
 
+The installed copy has the same script:
+
 ```sh
 sudo /opt/cam-proxy-pi-display/deploy/update.sh            # the latest release
 sudo /opt/cam-proxy-pi-display/deploy/update.sh vYYYY.MM.DD.N
 ```
 
-The config is kept. The restart draws "Display stopped", then the Overview.
+Downloading `update.sh` again and running `sudo sh update.sh` (as in Install) does the
+same. The config is kept. The restart draws "Display stopped", then the Overview.
 
 ## Configuration
 
@@ -223,7 +239,9 @@ Work goes to `main` through pull requests (checks `test` and `codeql`). A releas
 PR `main` → `production`; the release workflow tests that commit, tags it
 `vYYYY.MM.DD.N` (America/Chicago date, N counts that day's releases) and writes the
 release notes from `CHANGELOG.md`'s Unreleased section. The release is the tag and
-GitHub's source archive; `deploy/update.sh` installs it on the Pi.
+GitHub's source archive; `deploy/update.sh` installs it on the Pi. Nothing deploys on
+its own: there is no container image and no deploy job, and a release reaches the Pi only
+when someone runs `update.sh` there.
 
 ## License
 
