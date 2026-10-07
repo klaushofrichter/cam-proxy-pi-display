@@ -60,6 +60,23 @@ def test_overview_shows_items_as_given_and_the_summary(fonts):
     assert ls[-1] == ("All OK", "", False)
 
 
+# cam-proxy #199 adds an SD card item; with the Archive the Pi answers 12 items,
+# more than the 10 rows above the summary line.
+def test_overview_keeps_the_summary_line_when_items_do_not_fit(fonts):
+    ls = compose("overview", view("sd"), NOW, fonts).lines
+    assert ls[-1] == ("All OK", "", False)
+    assert ("SD card", "Overwrite is off: the camera stops recording to its SD card when it is full", False) in ls
+    assert len(ls) == 1 + 10 + 1  # header, 10 rows, summary
+    assert "Version" not in labels(ls)  # the last items give way (the Proxy page has the version)
+
+
+def test_overview_drops_only_items_without_a_problem(fonts):
+    ls = compose("overview", view("sd-inventory-failed"), NOW, fonts).lines
+    assert ("Last inventory", "clips: failed", True) in ls
+    assert ls[-1] == ("1 problem", "", True)
+    assert len(ls) == 12
+
+
 def test_overview_inverts_problems(fonts):
     ls = compose("overview", view("problems"), NOW, fonts).lines
     assert ("Camera", "offline", True) in ls

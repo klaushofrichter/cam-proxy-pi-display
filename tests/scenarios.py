@@ -32,9 +32,47 @@ def snap(name: str | None, *, error: str | None = None, at: float = FETCHED, loc
     )
 
 
+def with_sd(name: str, *, inventory_failed: bool = False) -> Snapshot:
+    """The Pi as cam-proxy answers since #199: the Archive item and the camera's SD card (12 items)."""
+    s = snap(name)
+    items = s.health["items"]
+    at = next(i for i, it in enumerate(items) if it["id"] == "ftp") + 1
+    items.insert(
+        at,
+        {
+            "id": "sd",
+            "label": "SD card",
+            "value": "overwrite_off",
+            "text": "Overwrite is off: the camera stops recording to its SD card when it is full",
+            "problem": False,
+            "warning": True,
+        },
+    )
+    at = next(i for i, it in enumerate(items) if it["id"] == "disk") + 1
+    items.insert(
+        at,
+        {
+            "id": "archive",
+            "label": "Archive",
+            "value": 0.1,
+            "text": "3 clips, 0.2 GB (0.1 % of disk)",
+            "problem": False,
+        },
+    )
+    if inventory_failed:
+        inv = next(it for it in items if it["id"] == "inventory")
+        inv.update(value="failed", text="clips: failed", problem=True)
+        s.health["ok"], s.health["problemCount"] = False, 1
+    return s
+
+
 def view(name: str) -> View:
     if name == "ok":
         return View(snap("pi-ok"))
+    if name == "sd":
+        return View(with_sd("pi-ok"))
+    if name == "sd-inventory-failed":
+        return View(with_sd("pi-ok", inventory_failed=True))
     if name == "problems":
         return View(snap("pi-problems"))
     if name == "cluster":
@@ -53,6 +91,7 @@ def view(name: str) -> View:
 # (golden name, page, view name)
 GOLDEN = [
     ("overview-ok", "overview", "ok"),
+    ("overview-sd", "overview", "sd"),
     ("overview-problems", "overview", "problems"),
     ("overview-cluster", "overview", "cluster"),
     ("overview-unreachable", "overview", "unreachable"),
