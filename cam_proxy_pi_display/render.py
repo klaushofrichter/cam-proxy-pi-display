@@ -178,7 +178,7 @@ def _overview(c: Canvas, view: View, now: datetime) -> None:
         _local_rows(c, view, col=96)
         _summary(c, 1, view.changing_often)
         return
-    items = [i for i in h.get("items", []) if isinstance(i, dict)]
+    items = _fitting(c, [i for i in h.get("items", []) if isinstance(i, dict)])
     # The text column starts after the widest label (labels are shown as the API gives them).
     widest = max((c.width(str(i.get("label", "")), c.regular) for i in items), default=0)
     col = int(min(132, MARGIN + widest + 8))
@@ -192,6 +192,19 @@ def _overview(c: Canvas, view: View, now: datetime) -> None:
     if not isinstance(count, int):
         count = sum(1 for i in items if i.get("problem") is True)
     _summary(c, count, view.changing_often)
+
+
+def _fitting(c: Canvas, items: list[dict]) -> list[dict]:
+    """The items that fit above the summary line: past that, the last items without a problem give way."""
+    rows = (HEIGHT - ROW_H - c.y) // ROW_H
+    drop = len(items) - rows
+    gone: set[int] = set()
+    for n in range(len(items) - 1, -1, -1):
+        if len(gone) >= drop:
+            break
+        if items[n].get("problem") is not True:
+            gone.add(n)
+    return [it for n, it in enumerate(items) if n not in gone][:rows]
 
 
 def _unreachable_block(c: Canvas, view: View, now: datetime) -> None:
