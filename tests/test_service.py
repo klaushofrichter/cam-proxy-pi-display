@@ -1,5 +1,6 @@
 import copy
 import threading
+import time
 
 from PIL import Image
 
@@ -211,3 +212,23 @@ def test_fake_panel_names_an_unlabelled_draw_page(tmp_path, fonts):
     panel = FakePanel(tmp_path / "out", clock=Clock(FETCHED))
     panel.show(Image.new("1", (264, 176), 255))
     assert [p.name.split("-", 2)[2] for p in (tmp_path / "out").glob("0*.png")] == ["page.png"]
+
+
+def test_run_draws_a_key_press(tmp_path, fonts):
+    svc, api, panel, clock = make(tmp_path, fonts)
+    t = threading.Thread(target=svc.run)
+    t.start()
+    try:
+        deadline = time.monotonic() + 5
+        while panel.count < 1 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        svc.press("camera")
+        while panel.count < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+    finally:
+        svc.request_stop()
+        t.join(5)
+    assert not t.is_alive()
+    assert svc.policy.page == "camera"
+    names = [p.name.split("-", 2)[2] for p in sorted((tmp_path / "out").glob("0*.png"))]
+    assert names == ["overview-start.png", "camera-key.png", "stopped.png"]

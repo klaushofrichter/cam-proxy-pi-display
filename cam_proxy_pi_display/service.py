@@ -140,15 +140,16 @@ class Service:
             self.draw(due.page, due.reason, now)
 
     def run(self) -> None:
+        first = None
         while not self.stopping.is_set():
-            self.step()
+            self.step(first)  # first (a key that woke the wait) is drained with the rest
             try:
                 first = self.q.get(timeout=1.0)
             except queue.Empty:
+                first = None
                 continue
             if first == STOP:
                 break
-            self.q.put(first)  # step() drains it with the rest
         self.shutdown()
 
     def shutdown(self) -> None:
