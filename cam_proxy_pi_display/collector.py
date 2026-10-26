@@ -36,9 +36,7 @@ def fetch_health(url: str, timeout: float) -> tuple[dict | None, str | None]:
         return None, f"HTTP {e.code}"
     except urllib.error.URLError as e:
         return None, _reason(e.reason)
-    except TimeoutError:
-        return None, "timeout"
-    except OSError as e:
+    except OSError as e:  # TimeoutError too: _reason maps it
         return None, _reason(e)
     return parse_health(body)
 
@@ -61,7 +59,7 @@ def parse_health(body: bytes | str) -> tuple[dict | None, str | None]:
 
 
 def _reason(r) -> str:
-    if isinstance(r, (TimeoutError, socket.timeout)):
+    if isinstance(r, TimeoutError):  # socket.timeout is TimeoutError
         return "timeout"
     if isinstance(r, ConnectionRefusedError):
         return "connection refused"
