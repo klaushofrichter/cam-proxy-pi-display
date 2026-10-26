@@ -26,6 +26,11 @@ def stamp(t: int | float | datetime, tz: tzinfo | None = None) -> str:
     return f"{DAYS[t.weekday()]} {MONTHS[t.month - 1]} {t.day} {hhmm(t)}"
 
 
+def local_time(t: float, tz: tzinfo | None = None) -> datetime:
+    """Unix seconds as an aware datetime in `tz` (default the system's zone, with its DST rules)."""
+    return datetime.fromtimestamp(t, tz or system_tz())
+
+
 def system_tz() -> tzinfo:
     """The system's zone with its DST rules (/etc/localtime), else the current offset."""
     try:

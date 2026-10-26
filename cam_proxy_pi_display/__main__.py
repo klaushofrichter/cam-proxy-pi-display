@@ -13,7 +13,7 @@ import time
 from pathlib import Path
 
 from . import config as config_mod
-from . import localstats
+from . import fmt, localstats
 from .collector import Snapshot, fetch_health, parse_health
 from .fonts import Fonts
 from .panel import FakePanel
@@ -66,21 +66,13 @@ def once(args, cfg, fonts) -> int:
     else:
         health, err = fetch_health(cfg.api.url, cfg.api.timeout_s)
     snap = Snapshot(health=health, error=err, fetched_at=now, local=localstats.read())
-    img = render(args.once, View(snap, snap if health else None), time_now(now), fonts)
+    img = render(args.once, View(snap, snap if health else None), fmt.local_time(now), fonts)
     panel = make_panel(args)
     try:
         panel.show(img, label=args.once)
     finally:
         panel.close()
     return 0
-
-
-def time_now(t: float):
-    from datetime import datetime
-
-    from .fmt import system_tz
-
-    return datetime.fromtimestamp(t, system_tz())
 
 
 def main(argv=None) -> int:

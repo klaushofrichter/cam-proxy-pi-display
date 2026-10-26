@@ -58,7 +58,7 @@ class Service:
 
     def local_time(self, t: float) -> datetime:
         # The zone with its DST rules, so older timestamps get their own offset.
-        return datetime.fromtimestamp(t, self.tz or self._system_tz)
+        return fmt.local_time(t, self.tz or self._system_tz)
 
     # --- inputs ------------------------------------------------------------------------
 
