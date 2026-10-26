@@ -95,10 +95,8 @@ class Service:
         assert self.snap is not None
         view = View(self.snap, self.last_ok, self.policy.changing_often(now))
         img = render(page, view, self.local_time(now), self.fonts)
-        if hasattr(self.panel, "label"):
-            self.panel.label = f"{page}-{reason}"
         try:
-            self.panel.show(img, clear_first=clear)
+            self.panel.show(img, clear_first=clear, label=f"{page}-{reason}")
         except Exception:  # noqa: BLE001 (keep running; the next timer tries again)
             log.exception("drawing %s (%s) failed", page, reason)
         else:
@@ -160,9 +158,7 @@ class Service:
         log.info("stopping: drawing the stopped page")
         try:
             img = render("stopped", View(self.snap, self.last_ok), self.local_time(now), self.fonts)
-            if hasattr(self.panel, "label"):
-                self.panel.label = "stopped"
-            self.panel.show(img)
+            self.panel.show(img, label="stopped")
         except Exception:  # noqa: BLE001
             log.exception("drawing the stopped page failed")
         finally:

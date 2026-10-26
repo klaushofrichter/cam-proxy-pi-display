@@ -68,10 +68,8 @@ def once(args, cfg, fonts) -> int:
     snap = Snapshot(health=health, error=err, fetched_at=now, local=localstats.read())
     img = render(args.once, View(snap, snap if health else None), time_now(now), fonts)
     panel = make_panel(args)
-    if isinstance(panel, FakePanel):
-        panel.label = args.once
     try:
-        panel.show(img)
+        panel.show(img, label=args.once)
     finally:
         panel.close()
     return 0

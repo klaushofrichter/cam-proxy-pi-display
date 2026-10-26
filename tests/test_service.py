@@ -1,6 +1,8 @@
 import copy
 import threading
 
+from PIL import Image
+
 from cam_proxy_pi_display.config import Config
 from cam_proxy_pi_display.panel import FakePanel
 from cam_proxy_pi_display.service import Service
@@ -182,3 +184,30 @@ def test_run_and_stop_draws_the_stopped_page(tmp_path, fonts):
     assert not t.is_alive()
     assert panel.count >= 1
     assert sorted((tmp_path / "out").glob("*-stopped.png"))
+
+
+def test_each_draw_is_named_page_and_reason(tmp_path, fonts):
+    t0 = FETCHED + (16 * 60 + 35) * 60  # 03:00 local the next day: the clear comes at 03:30
+    svc, api, panel, clock = make(tmp_path, fonts, t0=t0)
+    svc.step()
+    svc.press("camera")
+    svc.step()
+    tick(svc, clock, 40)
+    svc.shutdown()
+    names = sorted(p.name.split("-", 2)[2] for p in (tmp_path / "out").glob("0*.png"))
+    assert names == sorted(
+        [
+            "overview-start.png",
+            "camera-key.png",
+            "overview-return.png",
+            "overview-timer.png",
+            "overview-clear-clear.png",
+            "stopped.png",
+        ]
+    )
+
+
+def test_fake_panel_names_an_unlabelled_draw_page(tmp_path, fonts):
+    panel = FakePanel(tmp_path / "out", clock=Clock(FETCHED))
+    panel.show(Image.new("1", (264, 176), 255))
+    assert [p.name.split("-", 2)[2] for p in (tmp_path / "out").glob("0*.png")] == ["page.png"]
