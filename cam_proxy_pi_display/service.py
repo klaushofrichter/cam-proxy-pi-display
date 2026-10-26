@@ -49,7 +49,7 @@ class Service:
         self.q: queue.Queue[str] = queue.Queue()
         self.stopping = threading.Event()
         now = clock()
-        self.policy = RefreshPolicy(cfg.refresh, now, self.local_time(now))
+        self.policy = RefreshPolicy(cfg.refresh, self.local_time(now))
         self.snap: Snapshot | None = None
         self.last_ok: Snapshot | None = None
         self.next_poll = now
@@ -58,7 +58,7 @@ class Service:
 
     def local_time(self, t: float) -> datetime:
         # The zone with its DST rules, so older timestamps get their own offset.
-        return datetime.fromtimestamp(t, self.tz or self._system_tz)
+        return fmt.local_time(t, self.tz or self._system_tz)
 
     # --- inputs ------------------------------------------------------------------------
 
@@ -85,7 +85,7 @@ class Service:
         elif self.snap is None or self.snap.health is not None:
             log.warning("proxy unreachable: %s", err)
         self.snap = snap
-        self.policy.observe(problem_set(snap), now)
+        self.policy.observe(problem_set(snap))
         self.next_poll = now + self.cfg.api.poll_interval_s
         return snap
 
@@ -93,17 +93,16 @@ class Service:
 
     def draw(self, page: str, reason: str, now: float, *, clear: bool = False) -> None:
         assert self.snap is not None
+        problems = problem_set(self.snap)
         view = View(self.snap, self.last_ok, self.policy.changing_often(now))
         img = render(page, view, self.local_time(now), self.fonts)
-        if hasattr(self.panel, "label"):
-            self.panel.label = f"{page}-{reason}"
         try:
-            self.panel.show(img, clear_first=clear)
+            self.panel.show(img, clear_first=clear, label=f"{page}-{reason}")
         except Exception:  # noqa: BLE001 (keep running; the next timer tries again)
             log.exception("drawing %s (%s) failed", page, reason)
         else:
-            log.info("drew %s (%s), problems: %s", page, reason, sorted(problem_set(self.snap)) or "none")
-        self.policy.drawn(page, problem_set(self.snap), now, reason)
+            log.info("drew %s (%s), problems: %s", page, reason, sorted(problems) or "none")
+        self.policy.drawn(page, problems, now, reason)
 
     def key(self, action: str, now: float) -> None:
         page = self.policy.page if action == "update" else action
@@ -142,15 +141,16 @@ class Service:
             self.draw(due.page, due.reason, now)
 
     def run(self) -> None:
+        first = None
         while not self.stopping.is_set():
-            self.step()
+            self.step(first)  # first (a key that woke the wait) is drained with the rest
             try:
                 first = self.q.get(timeout=1.0)
             except queue.Empty:
+                first = None
                 continue
             if first == STOP:
                 break
-            self.q.put(first)  # step() drains it with the rest
         self.shutdown()
 
     def shutdown(self) -> None:
@@ -160,9 +160,7 @@ class Service:
         log.info("stopping: drawing the stopped page")
         try:
             img = render("stopped", View(self.snap, self.last_ok), self.local_time(now), self.fonts)
-            if hasattr(self.panel, "label"):
-                self.panel.label = "stopped"
-            self.panel.show(img)
+            self.panel.show(img, label="stopped")
         except Exception:  # noqa: BLE001
             log.exception("drawing the stopped page failed")
         finally:

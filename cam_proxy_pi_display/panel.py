@@ -19,7 +19,8 @@ log = logging.getLogger(__name__)
 
 
 class Panel(Protocol):
-    def show(self, image: Image.Image, *, clear_first: bool = False) -> None: ...
+    def show(self, image: Image.Image, *, clear_first: bool = False, label: str = "page") -> None:
+        """Draw `image`; `label` names the draw (page and reason) where that is kept."""
 
     def close(self) -> None: ...
 
@@ -34,7 +35,7 @@ class EpdPanel:
         self._epd = epd2in7.EPD()
         log.info("panel: Waveshare epd2in7 (V1), %dx%d landscape", self._epd.height, self._epd.width)
 
-    def show(self, image: Image.Image, *, clear_first: bool = False) -> None:
+    def show(self, image: Image.Image, *, clear_first: bool = False, label: str = "page") -> None:
         t0 = time.monotonic()
         if self._epd.init() == -1:
             raise RuntimeError("e-paper init failed")
@@ -61,17 +62,16 @@ class FakePanel:
         self.dir.mkdir(parents=True, exist_ok=True)
         self.count = 0
         self.clears = 0
-        self.label = "page"
         self._clock = clock
         self.images: list[Image.Image] = []
 
-    def show(self, image: Image.Image, *, clear_first: bool = False) -> None:
+    def show(self, image: Image.Image, *, clear_first: bool = False, label: str = "page") -> None:
         self.count += 1
         if clear_first:
             self.clears += 1
         self.images.append(image.copy())
         stamp = datetime.fromtimestamp(self._clock()).strftime("%H%M%S")
-        name = f"{self.count:04d}-{stamp}-{self.label}{'-clear' if clear_first else ''}.png"
+        name = f"{self.count:04d}-{stamp}-{label}{'-clear' if clear_first else ''}.png"
         image.save(self.dir / name)
         image.save(self.dir / "latest.png")
         log.info("fake panel: wrote %s", self.dir / name)

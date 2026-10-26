@@ -31,7 +31,7 @@ class Draw:
 
 
 class RefreshPolicy:
-    def __init__(self, cfg: RefreshConfig, now: float, local_now: datetime | None = None):
+    def __init__(self, cfg: RefreshConfig, local_now: datetime | None = None):
         self.cfg = cfg
         self.page = OVERVIEW
         self.last_draw_at: float | None = None
@@ -49,7 +49,7 @@ class RefreshPolicy:
 
     # --- inputs ---------------------------------------------------------------
 
-    def observe(self, problems: frozenset[str], now: float) -> None:
+    def observe(self, problems: frozenset[str]) -> None:
         """One poll's (or a key's fresh fetch's) set of problems."""
         if problems == self.latest:
             self._count += 1
