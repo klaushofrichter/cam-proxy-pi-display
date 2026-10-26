@@ -23,7 +23,6 @@ HEADER_H = 18
 ROW_H = 14
 MARGIN = 4
 
-PAGES = ("overview", "camera", "proxy", "pi")
 TITLES = {"overview": "Overview", "camera": "Camera", "proxy": "Proxy", "pi": "Pi", "stopped": "Display stopped"}
 DEFAULT_THRESHOLDS = {"diskPercent": 90, "tempC": 75}
 
@@ -41,8 +40,8 @@ class Canvas:
         self.img = Image.new("1", (WIDTH, HEIGHT), WHITE)
         self.d = ImageDraw.Draw(self.img)
         self.y = HEADER_H + 2
-        self.lines: list[tuple[str, str, bool]] = []
-        self.header_title_drawn = ""  # (label, text, problem) as drawn, for the tests
+        self.lines: list[tuple[str, str, bool]] = []  # (label, text, problem) as drawn, for the tests
+        self.header_title_drawn = ""
         self.regular = fonts.get("regular", 12)
         self.bold = fonts.get("bold", 12)
 
@@ -153,12 +152,25 @@ def _at(ms: int | float, now: datetime) -> str:
     return fmt.stamp(ms, now.tzinfo)
 
 
+def _fetched(snap: Snapshot, now: datetime) -> str:
+    return _at(snap.fetched_at * 1000, now)
+
+
 def _updated(view: View, now: datetime) -> str:
-    return f"updated {_at(view.snap.fetched_at * 1000, now)}"
+    return f"updated {_fetched(view.snap, now)}"
+
+
+def _s(n) -> str:
+    """The plural ending for a count of n."""
+    return "" if n == 1 else "s"
+
+
+def _state(n) -> str:
+    return "All OK" if not n else f"{n} problem{_s(n)}"
 
 
 def _summary(c: Canvas, n: int, changing_often: bool) -> None:
-    text = "All OK" if n == 0 else f"{n} problem" + ("" if n == 1 else "s")
+    text = _state(n)
     if changing_often:
         text += " · changing often"
     c.footer(text, problem=n > 0)
@@ -209,9 +221,13 @@ def _fitting(c: Canvas, items: list[dict]) -> list[dict]:
 
 def _unreachable_block(c: Canvas, view: View, now: datetime) -> None:
     c.big("Proxy unreachable", problem=True)
-    c.row("Reason", view.snap.error or "no answer", col=96)
+    _unreachable_rows(c, view, now, col=96)
+
+
+def _unreachable_rows(c: Canvas, view: View, now: datetime, col: int) -> None:
+    c.row("Reason", view.snap.error or "no answer", col=col)
     if view.last_ok is not None:
-        c.row("Last data", _at(view.last_ok.fetched_at * 1000, now), col=96)
+        c.row("Last data", _fetched(view.last_ok, now), col=col)
 
 
 def _local_rows(c: Canvas, view: View, col: int) -> None:
@@ -225,7 +241,7 @@ def _local_rows(c: Canvas, view: View, col: int) -> None:
             "Disk",
             f"{fmt.percent(p)}, {fmt.gb(disk['freeBytes'])} free",
             problem=p >= th["diskPercent"],
-            col=col + 0,
+            col=col,
             bar=(44, col - 6, p),
         )
     if _num(loc.get("cpuTempC")):
@@ -277,7 +293,7 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
     ev = str(ev_item.get("text", events.get("onvif", "")))
     if _num(events.get("resubscribes")):
         n = int(events["resubscribes"])
-        ev += f", {n} resubscribe" + ("" if n == 1 else "s")
+        ev += f", {n} resubscribe{_s(n)}"
     c.row("Events", ev, problem=ev_item.get("problem") is True, col=col)
 
     ftp_item = it.get("ftp", {})
@@ -313,9 +329,7 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
     col = 102
     if h is None:
         c.row("Version", "unreachable", problem=True, bold=True, col=col)
-        c.row("Reason", view.snap.error or "no answer", col=col)
-        if view.last_ok is not None:
-            c.row("Last data", _at(view.last_ok.fetched_at * 1000, now), col=col)
+        _unreachable_rows(c, view, now, col=col)
         return
     it = _items(h)
     proxy = h.get("proxy") or {}
@@ -335,7 +349,7 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
         files = cache.get("files")
         text = f"{fmt.size(cache['bytes'])} of {fmt.size(cache['capBytes'])}"
         if _num(files):
-            text += f", {int(files)} file" + ("" if files == 1 else "s")
+            text += f", {int(files)} file{_s(files)}"
         c.row("Rec. cache", text, col=col)
     if _num(proxy.get("sseClients")):
         c.row("Viewers", str(int(proxy["sseClients"])), col=col)
@@ -410,9 +424,8 @@ def _stopped(c: Canvas, view: View, now: datetime) -> None:
     c.row("is not running.")
     snap = view.snap if view.snap.health is not None else view.last_ok
     if snap is not None and snap.health is not None:
-        n = snap.health.get("problemCount", 0)
-        state = "All OK" if not n else f"{n} problem" + ("" if n == 1 else "s")
-        c.footer(f"Last data {_at(snap.fetched_at * 1000, now)}: {state}", bold=False)
+        state = _state(snap.health.get("problemCount", 0))
+        c.footer(f"Last data {_fetched(snap, now)}: {state}", bold=False)
     elif view.snap.health is None:
         c.footer("Last data: proxy unreachable", bold=False)
 
