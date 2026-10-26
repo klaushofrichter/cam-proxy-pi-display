@@ -49,7 +49,7 @@ class Service:
         self.q: queue.Queue[str] = queue.Queue()
         self.stopping = threading.Event()
         now = clock()
-        self.policy = RefreshPolicy(cfg.refresh, now, self.local_time(now))
+        self.policy = RefreshPolicy(cfg.refresh, self.local_time(now))
         self.snap: Snapshot | None = None
         self.last_ok: Snapshot | None = None
         self.next_poll = now
@@ -85,7 +85,7 @@ class Service:
         elif self.snap is None or self.snap.health is not None:
             log.warning("proxy unreachable: %s", err)
         self.snap = snap
-        self.policy.observe(problem_set(snap), now)
+        self.policy.observe(problem_set(snap))
         self.next_poll = now + self.cfg.api.poll_interval_s
         return snap
 
