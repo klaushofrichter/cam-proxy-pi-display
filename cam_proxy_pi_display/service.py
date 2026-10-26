@@ -93,6 +93,7 @@ class Service:
 
     def draw(self, page: str, reason: str, now: float, *, clear: bool = False) -> None:
         assert self.snap is not None
+        problems = problem_set(self.snap)
         view = View(self.snap, self.last_ok, self.policy.changing_often(now))
         img = render(page, view, self.local_time(now), self.fonts)
         try:
@@ -100,8 +101,8 @@ class Service:
         except Exception:  # noqa: BLE001 (keep running; the next timer tries again)
             log.exception("drawing %s (%s) failed", page, reason)
         else:
-            log.info("drew %s (%s), problems: %s", page, reason, sorted(problem_set(self.snap)) or "none")
-        self.policy.drawn(page, problem_set(self.snap), now, reason)
+            log.info("drew %s (%s), problems: %s", page, reason, sorted(problems) or "none")
+        self.policy.drawn(page, problems, now, reason)
 
     def key(self, action: str, now: float) -> None:
         page = self.policy.page if action == "update" else action
