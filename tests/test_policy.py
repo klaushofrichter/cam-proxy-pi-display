@@ -11,9 +11,9 @@ TZ = timezone(timedelta(hours=-5))
 
 
 def started(t=0.0, cfg=None):
-    p = RefreshPolicy(cfg or RefreshConfig(), now=t)
+    p = RefreshPolicy(cfg or RefreshConfig())
     assert p.due(t) == Draw("overview", "start")
-    p.observe(OK, t)
+    p.observe(OK)
     p.drawn("overview", OK, t, "start")
     return p
 
@@ -23,7 +23,7 @@ def run(p, t0, t1, problems, step=MIN):
     draws = []
     t = t0
     while t < t1:
-        p.observe(problems(t) if callable(problems) else problems, t)
+        p.observe(problems(t) if callable(problems) else problems)
         d = p.due(t)
         if d:
             draws.append((t, d))
@@ -33,7 +33,7 @@ def run(p, t0, t1, problems, step=MIN):
 
 
 def test_first_draw_is_the_overview():
-    p = RefreshPolicy(RefreshConfig(), now=0)
+    p = RefreshPolicy(RefreshConfig())
     assert p.due(0) == Draw("overview", "start")
 
 
@@ -127,7 +127,7 @@ def test_changing_often_ends_when_the_hour_has_room():
 
 def test_key_draws_at_once_and_returns_to_overview_after_10_minutes():
     p = started()
-    p.observe(OK, 2 * MIN)
+    p.observe(OK)
     p.drawn("camera", OK, 2 * MIN, "key")
     assert p.page == "camera"
     draws = run(p, 3 * MIN, 13 * MIN, OK)
@@ -159,7 +159,7 @@ def test_unreachable_counts_as_a_problem_change():
 
 def test_daily_clear_once_at_03_30():
     start = datetime(2026, 10, 3, 10, 0, tzinfo=TZ)
-    p = RefreshPolicy(RefreshConfig(), now=0, local_now=start)
+    p = RefreshPolicy(RefreshConfig(), local_now=start)
     assert not p.clear_due(start)
     assert not p.clear_due(datetime(2026, 10, 4, 3, 29, tzinfo=TZ))
     assert p.clear_due(datetime(2026, 10, 4, 3, 30, tzinfo=TZ))
@@ -171,5 +171,5 @@ def test_daily_clear_once_at_03_30():
 
 def test_daily_clear_today_when_started_before_03_30():
     start = datetime(2026, 10, 3, 1, 0, tzinfo=TZ)
-    p = RefreshPolicy(RefreshConfig(), now=0, local_now=start)
+    p = RefreshPolicy(RefreshConfig(), local_now=start)
     assert p.clear_due(datetime(2026, 10, 3, 3, 30, tzinfo=TZ))

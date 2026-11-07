@@ -1,5 +1,8 @@
 import json
+import socket
 import threading
+import urllib.error
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
@@ -95,3 +98,24 @@ def test_problem_set_from_items():
 def test_problem_set_unreachable():
     s = Snapshot(health=None, error="timeout", fetched_at=0, local={})
     assert problem_set(s) == frozenset({"proxy-unreachable"})
+
+
+@pytest.mark.parametrize(
+    ("exc", "reason"),
+    [
+        (TimeoutError("timed out"), "timeout"),
+        (urllib.error.URLError(TimeoutError("timed out")), "timeout"),
+        (ConnectionRefusedError(111, "Connection refused"), "connection refused"),
+        (urllib.error.URLError(ConnectionRefusedError(111, "Connection refused")), "connection refused"),
+        (urllib.error.URLError(socket.gaierror(8, "nodename nor servname")), "name not found"),
+        (ConnectionResetError(54, "Connection reset by peer"), "connection reset by peer"),
+        (urllib.error.URLError("unknown url type: x"), "unknown url type: x"),
+        (OSError(), "error"),
+    ],
+)
+def test_fetch_failure_reasons(monkeypatch, exc, reason):
+    def boom(*a, **k):
+        raise exc
+
+    monkeypatch.setattr(urllib.request, "urlopen", boom)
+    assert fetch_health("http://example.test/api/local/health", 1) == (None, reason)

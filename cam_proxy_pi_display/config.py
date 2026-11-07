@@ -64,8 +64,7 @@ def _section(cls, raw: dict, name: str):
         if key not in known:
             log.warning("config: unknown setting %s.%s ignored", name, key)
             continue
-        default = getattr(cls(), key)
-        kwargs[key] = _coerce(value, default, f"{name}.{key}")
+        kwargs[key] = _coerce(value, known[key].default, f"{name}.{key}")
     return cls(**kwargs)
 
 
@@ -74,7 +73,7 @@ def _coerce(value, default, name: str):
         if not isinstance(value, bool):
             raise ConfigError(f"{name} must be true or false")
         return value
-    if isinstance(default, int) and not isinstance(default, bool):
+    if isinstance(default, int):  # bool is handled above
         if isinstance(value, bool) or not isinstance(value, int):
             raise ConfigError(f"{name} must be an integer")
         return value

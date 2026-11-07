@@ -73,3 +73,12 @@ def test_offset():
     assert fmt.offset_ms(-412) == "-412 ms"
     assert fmt.offset_ms(3) == "+3 ms"
     assert fmt.offset_ms(-2412) == "-2.4 s"
+
+
+def test_local_time_in_a_zone_or_the_systems():
+    t = ms(NOW) / 1000
+    assert fmt.local_time(t, TZ) == NOW
+    assert fmt.local_time(t, TZ).utcoffset() == timedelta(hours=-5)
+    system = fmt.local_time(t)
+    assert system == NOW
+    assert system.utcoffset() == datetime.fromtimestamp(t, fmt.system_tz()).utcoffset()

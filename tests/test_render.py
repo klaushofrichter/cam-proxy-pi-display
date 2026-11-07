@@ -253,3 +253,27 @@ def test_stopped_header_fits(fonts):
     c = Canvas(fonts)
     c.header("Display stopped", "Wed May 28 23:59")
     assert c.header_title_drawn == "Display stopped"
+
+
+def test_counts_are_singular_for_one(fonts):
+    h = load_fixture("pi-ok")
+    h["events"]["resubscribes"] = 1
+    h["proxy"]["recordingsCache"]["files"] = 1
+    v = View(Snapshot(h, None, FETCHED, LOCAL))
+    assert ("Events", "subscribed, 1 resubscribe", False) in compose("camera", v, NOW, fonts).lines
+    assert ("Rec. cache", "700 MB of 2.0 GB, 1 file", False) in compose("proxy", v, NOW, fonts).lines
+    h["events"]["resubscribes"] = 2
+    assert ("Events", "subscribed, 2 resubscribes", False) in compose("camera", v, NOW, fonts).lines
+
+
+@pytest.mark.parametrize(
+    ("count", "state"), [(0, "All OK"), (1, "1 problem"), (2, "2 problems"), (None, "All OK"), ("x", "x problems")]
+)
+def test_stopped_page_summary(count, state, fonts):
+    h = load_fixture("pi-ok")
+    if count is None:
+        del h["problemCount"]
+    else:
+        h["problemCount"] = count
+    ls = compose("stopped", View(Snapshot(h, None, FETCHED, LOCAL)), NOW, fonts).lines
+    assert ls[-1] == (f"Last data Sat Oct 3 10:25: {state}", "", False)
