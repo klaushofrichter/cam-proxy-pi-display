@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2026.10.07.1
+
 - The Overview keeps its summary line ("All OK" / "N problems") when cam-proxy lists more items than fit: the last items without a problem give way (the version first; it is on the Proxy page). cam-proxy's Archive item already made 11 items on the Pi, which pushed the summary off the screen; its SD card item (cam-proxy #199) makes 12.
 
 ## v2026.10.03.2
