@@ -4,4 +4,4 @@
 pillow==13.0.0
 gpiozero==2.0.1.post3
 pytest==9.2.0
-ruff==0.17.3
+ruff==0.17.4
