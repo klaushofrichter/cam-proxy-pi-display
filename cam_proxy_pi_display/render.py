@@ -189,6 +189,24 @@ def _api_problem(items: dict[str, dict], item_id: str, local_rule: bool) -> bool
     return is_problem(items[item_id]) if item_id in items else local_rule
 
 
+def _disk_percent(disk) -> float | None:
+    """The disk's used percent, when the figure is there."""
+    return float(disk["usedPercent"]) if isinstance(disk, dict) and _num(disk.get("usedPercent")) else None
+
+
+def _disk_problem(p: float, th: dict, items: dict[str, dict]) -> bool:
+    return _api_problem(items, "disk", p >= th["diskPercent"])
+
+
+def _temp_row(c: Canvas, t: float, th: dict, items: dict[str, dict], col: int) -> None:
+    c.row("CPU temp", f"{t:.1f} °C", problem=_api_problem(items, "cpuTemp", t >= th["tempC"]), col=col)
+
+
+def _ip_row(c: Canvas, loc: dict, col: int) -> None:
+    if loc.get("ip"):
+        c.row("IP address", str(loc["ip"]), col=col)
+
+
 # --- pages -----------------------------------------------------------------------------
 
 
@@ -244,22 +262,15 @@ def _local_rows(c: Canvas, view: View, col: int) -> None:
     loc = view.snap.local or {}
     th = _thresholds(view)
     disk = loc.get("disk")
-    if isinstance(disk, dict) and _num(disk.get("usedPercent")):
-        p = float(disk["usedPercent"])
-        c.row(
-            "Disk",
-            f"{fmt.percent(p)}, {fmt.gb(disk['freeBytes'])} free",
-            problem=p >= th["diskPercent"],
-            col=col,
-            bar=(44, col - 6, p),
-        )
+    p = _disk_percent(disk)
+    if p is not None:
+        text = f"{fmt.percent(p)}, {fmt.gb(disk['freeBytes'])} free"
+        c.row("Disk", text, problem=_disk_problem(p, th, {}), col=col, bar=(44, col - 6, p))
     if _num(loc.get("cpuTempC")):
-        t = float(loc["cpuTempC"])
-        c.row("CPU temp", f"{t:.1f} °C", problem=t >= th["tempC"], col=col)
+        _temp_row(c, float(loc["cpuTempC"]), th, {}, col)
     if _num(loc.get("uptimeS")):
         c.row("Uptime", fmt.duration(loc["uptimeS"]), col=col)
-    if loc.get("ip"):
-        c.row("IP address", str(loc["ip"]), col=col)
+    _ip_row(c, loc, col)
 
 
 def _camera(c: Canvas, view: View, now: datetime) -> None:
@@ -388,17 +399,15 @@ def _pi(c: Canvas, view: View, now: datetime) -> None:
         c.row("Proxy", "unreachable", problem=True, col=col)
 
     disk = (h or {}).get("disk") or loc.get("disk")
-    if isinstance(disk, dict) and _num(disk.get("usedPercent")):
-        p = float(disk["usedPercent"])
-        problem = _api_problem(it, "disk", p >= th["diskPercent"])
-        c.row("Disk", fmt.percent(p), problem=problem, col=col + 62, bar=(col, col + 56, p))
+    p = _disk_percent(disk)
+    if p is not None:
+        c.row("Disk", fmt.percent(p), problem=_disk_problem(p, th, it), col=col + 62, bar=(col, col + 56, p))
         if _num(disk.get("freeBytes")) and _num(disk.get("sizeBytes")):
             c.row("Free", f"{fmt.gb(disk['freeBytes'])} of {fmt.gb(disk['sizeBytes'])}", col=col)
 
     temp = _pick(host, loc, "cpuTempC")
     if _num(temp):
-        problem = _api_problem(it, "cpuTemp", temp >= th["tempC"])
-        c.row("CPU temp", f"{float(temp):.1f} °C", problem=problem, col=col)
+        _temp_row(c, float(temp), th, it, col)
 
     mem = host.get("memory")
     if isinstance(mem, dict) and _num(mem.get("usedPercent")) and _num(mem.get("totalBytes")):
@@ -416,8 +425,7 @@ def _pi(c: Canvas, view: View, now: datetime) -> None:
     if uv:
         c.row("Under-voltage", str(uv.get("text", "")), problem=is_problem(uv), col=col)
 
-    if loc.get("ip"):
-        c.row("IP address", str(loc["ip"]), col=col)
+    _ip_row(c, loc, col)
 
     if h is not None and not platform.get("pi") and not host:
         c.row("Proxy host", "not a Raspberry Pi", col=col)
