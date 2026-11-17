@@ -98,10 +98,7 @@
     "clockOffsetMs": -412,
     "error": "timeout",
     "reboot": null,
-    "poeSwitch": {
-      "model": "sscpoe-web",
-      "port": 8
-    }
+    "poeSwitch": null
   },
   "stream": {
     "enabled": true,

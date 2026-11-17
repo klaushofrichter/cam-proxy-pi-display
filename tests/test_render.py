@@ -14,7 +14,7 @@ from PIL import Image, ImageChops
 from cam_proxy_pi_display.collector import Snapshot
 from cam_proxy_pi_display.render import HEIGHT, WIDTH, View, compose, render
 from tests.fixtures import load_fixture
-from tests.scenarios import FETCHED, GOLDEN, LOCAL, NOW, view
+from tests.scenarios import FETCHED, GOLDEN, LOCAL, NOW, view, with_sd
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
 # FreeType versions may move a few anti-aliasing-threshold pixels; a changed word moves hundreds.
@@ -135,7 +135,6 @@ def test_camera_page(fonts):
     assert ("Last clip", "Sat Oct 3 09:53", False) in ls
     assert ("Firmware", "v3.1.0.4054_2409213180", False) in ls
     assert ("Stall check", "ok", False) in ls
-    assert ("PoE switch", "sscpoe-web port 8", False) in ls
     ls = compose("camera", view("problems"), NOW, fonts).lines
     assert ("Yard", "offline (timeout)", True) in ls
     assert ("Since", "Sat Oct 3 10:13", False) in ls
@@ -148,12 +147,12 @@ def test_camera_page(fonts):
 
 def test_null_figures_are_left_off(fonts):
     h = load_fixture("pi-ok")
-    h["camera"].update(model=None, firmware=None, clockOffsetMs=None, poeSwitch=None)
+    h["camera"].update(model=None, firmware=None, clockOffsetMs=None)
     h["host"].update(memory=None, load=None, cpuTempC=None)
     h["startedAt"] = None
     v = View(Snapshot(h, None, FETCHED, {}))
     cam = labels(compose("camera", v, NOW, fonts).lines)
-    assert not {"Model", "Firmware", "PoE switch"} & set(cam)
+    assert not {"Model", "Firmware"} & set(cam)
     assert ("Address", "192.0.2.10", False) in compose("camera", v, NOW, fonts).lines
     pi = labels(compose("pi", v, NOW, fonts).lines)
     assert not {"Memory", "Load", "CPU temp", "IP address"} & set(pi)
@@ -267,7 +266,7 @@ def test_counts_are_singular_for_one(fonts):
 
 
 @pytest.mark.parametrize(
-    ("count", "state"), [(0, "All OK"), (1, "1 problem"), (2, "2 problems"), (None, "All OK"), ("x", "x problems")]
+    ("count", "state"), [(0, "All OK"), (1, "1 problem"), (2, "2 problems"), (None, "All OK"), ("x", "All OK")]
 )
 def test_stopped_page_summary(count, state, fonts):
     h = load_fixture("pi-ok")
@@ -277,3 +276,81 @@ def test_stopped_page_summary(count, state, fonts):
         h["problemCount"] = count
     ls = compose("stopped", View(Snapshot(h, None, FETCHED, LOCAL)), NOW, fonts).lines
     assert ls[-1] == (f"Last data Sat Oct 3 10:25: {state}", "", False)
+
+
+def test_disk_percent_only_from_a_number():
+    from cam_proxy_pi_display.render import _disk_percent
+
+    assert _disk_percent({"usedPercent": 41}) == 41.0
+    assert _disk_percent({"usedPercent": True}) is None
+    assert _disk_percent({"usedPercent": None}) is None
+    assert _disk_percent(None) is None
+
+
+def test_disk_and_temp_problem_api_flag_else_threshold():
+    from cam_proxy_pi_display.render import _disk_problem
+
+    th = {"diskPercent": 90, "tempC": 75}
+    assert _disk_problem(95, th, {}) is True
+    assert _disk_problem(50, th, {}) is False
+    assert _disk_problem(95, th, {"disk": {"id": "disk", "problem": False}}) is False
+    assert _disk_problem(50, th, {"disk": {"id": "disk", "problem": True}}) is True
+
+
+def test_odd_shapes_and_out_of_range_times_still_render(fonts):
+    h = load_fixture("pi-ok")
+    h["camera"]["since"] = 1e20
+    h["thresholds"] = "x"
+    h["host"] = ["x"]
+    v = View(Snapshot(h, None, FETCHED, LOCAL))
+    assert ("Since", "?", False) in compose("camera", v, NOW, fonts).lines
+    compose("pi", v, NOW, fonts)
+    h.update(camera="x", stream=1, events=None, ftp="x", proxy=[])
+    for page in ("overview", "camera", "proxy", "pi"):
+        compose(page, v, NOW, fonts)
+
+
+def test_a_null_text_is_empty_not_none(fonts):
+    h = load_fixture("pi-ok")
+    for it in h["items"]:
+        it["text"] = None
+    h["items"][0]["label"] = None
+    v = View(Snapshot(h, None, FETCHED, LOCAL))
+    for page in ("overview", "camera", "proxy", "pi"):
+        drawn = compose(page, v, NOW, fonts).lines
+        assert not [line for line in drawn if "None" in line[0] or "None" in line[1]], page
+    ls = compose("camera", v, NOW, fonts).lines
+    assert ("Yard", "online", False) in ls  # the camera's own state when the item has no text
+    assert ("Stream", "frame Sat Oct 3 10:24", False) in ls  # no leading comma
+
+
+def test_camera_page_has_no_poe_switch_row(fonts):
+    # The switch data moved to cams-admin; cam-proxy sends camera.poeSwitch = null.
+    h = load_fixture("pi-ok")
+    for poe in (None, {"model": "sscpoe-web", "port": 8}, "x"):
+        h["camera"]["poeSwitch"] = poe
+        ls = compose("camera", View(Snapshot(h, None, FETCHED, LOCAL)), NOW, fonts).lines
+        assert "PoE switch" not in labels(ls)
+
+
+def _flag(h: dict, n: int) -> None:
+    """Flag the first n items and drop problemCount."""
+    del h["problemCount"]
+    for it in h["items"][:n]:
+        it["problem"] = True
+
+
+def test_without_problem_count_both_pages_count_the_flagged_items(fonts):
+    h = load_fixture("pi-ok")
+    _flag(h, 2)
+    v = View(Snapshot(h, None, FETCHED, LOCAL))
+    assert compose("overview", v, NOW, fonts).lines[-1] == ("2 problems", "", True)
+    assert compose("stopped", v, NOW, fonts).lines[-1] == ("Last data Sat Oct 3 10:25: 2 problems", "", False)
+
+
+def test_overview_counts_flagged_items_that_do_not_fit(fonts):
+    s = with_sd("pi-ok")  # 12 items, 10 rows
+    _flag(s.health, 12)
+    ls = compose("overview", View(s), NOW, fonts).lines
+    assert len(ls) == 12
+    assert ls[-1] == ("12 problems", "", True)

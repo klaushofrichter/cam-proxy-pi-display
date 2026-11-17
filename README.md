@@ -56,7 +56,7 @@ the API reports as `null` is left off.
 | Page | Shows |
 |---|---|
 | **Overview** (resting page) | The API's `items` as given (camera, live stream, events intake, camera FTP upload, storage, disk with a bar, CPU temperature, under-voltage, last inventory, version), then "All OK" or "N problems" (and "changing often", see below). When the proxy can't be reached: "Proxy unreachable", the reason, the time of the last data, and the Pi's own disk, CPU temperature, uptime and IP address. |
-| **Camera** | Online state and since when, model, firmware, address and clock offset; stream and the time of the last frame; ONVIF events state and resubscribes; camera FTP state and the time of the last clip; the FTP stall check; the PoE switch port. |
+| **Camera** | Online state and since when, model, firmware, address and clock offset; stream and the time of the last frame; ONVIF events state and resubscribes; camera FTP state and the time of the last clip; the FTP stall check. |
 | **Proxy** | **The installed proxy version first, in full** (or "unreachable"); up since; clips stored; FTP failures; storage writing or paused; recordings cache fill; viewers (SSE clients); last retention run; last inventory and when it ran. |
 | **Pi** | Model, disk bar, free GB, CPU temperature, memory, uptime, load, under-voltage, IP address. Works without the proxy: disk, temperature and uptime are read directly. |
 
@@ -90,6 +90,7 @@ e-paper wears and flashes, so the panel is driven only when it says something ne
   - at most **6 problem redraws per hour**; past that only the 15-minute timer draws and the Overview says **"changing often"**, until the hour has room again.
 - **Keys** draw at once (Waveshare's 180 s guidance is about unattended refreshes).
 - The panel **sleeps after every draw**. A **full clear once a day at 03:30** (local time) against ghosting.
+- A draw that fails (panel or rendering error) is not counted as shown: what was due is tried again a minute later, and the panel keeps its last image.
 
 All of these are settings (below).
 

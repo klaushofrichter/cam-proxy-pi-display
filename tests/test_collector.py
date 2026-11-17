@@ -7,7 +7,15 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from cam_proxy_pi_display.collector import Snapshot, fetch_health, problem_set
+from cam_proxy_pi_display.collector import (
+    Snapshot,
+    fetch_health,
+    is_problem,
+    problem_count,
+    problem_set,
+    snapshot,
+    valid_items,
+)
 from tests.fixtures import load_fixture
 
 
@@ -119,3 +127,66 @@ def test_fetch_failure_reasons(monkeypatch, exc, reason):
 
     monkeypatch.setattr(urllib.request, "urlopen", boom)
     assert fetch_health("http://example.test/api/local/health", 1) == (None, reason)
+
+
+def test_is_problem_only_on_true():
+    assert is_problem({"problem": True})
+    assert not is_problem({"problem": "true"})
+    assert not is_problem({"problem": 1})
+    assert not is_problem({})
+
+
+def test_valid_items_skips_non_objects():
+    assert valid_items({"items": [{"id": "a"}, "x", None, 3, {"id": "b"}]}) == [{"id": "a"}, {"id": "b"}]
+    assert valid_items({}) == []
+
+
+def test_problem_set_ignores_non_objects_and_non_true_flags():
+    h = {"items": ["camera", {"id": "disk", "problem": True}, {"id": "stream", "problem": "yes"}]}
+    assert problem_set(Snapshot(health=h, error=None, fetched_at=0)) == frozenset({"disk"})
+
+
+def test_snapshot_takes_the_answer_and_the_local_figures():
+    s = snapshot(lambda: ({"items": []}, None), lambda: {"uptimeS": 5}, 12.5)
+    assert s == Snapshot(health={"items": []}, error=None, fetched_at=12.5, local={"uptimeS": 5})
+
+
+def test_snapshot_leaves_out_local_figures_that_fail():
+    def boom():
+        raise OSError("no /proc")
+
+    s = snapshot(lambda: (None, "timeout"), boom, 1.0)
+    assert s == Snapshot(health=None, error="timeout", fetched_at=1.0, local={})
+
+
+def test_fetch_a_broken_http_answer_is_a_bad_answer():
+    # http.client.BadStatusLine is an HTTPException, not an OSError.
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+
+    def serve():
+        conn, _ = srv.accept()
+        with conn:
+            conn.recv(4096)
+            conn.sendall(b"GARBAGE\r\n\r\n")
+
+    t = threading.Thread(target=serve, daemon=True)
+    t.start()
+    try:
+        health, err = fetch_health(f"http://127.0.0.1:{srv.getsockname()[1]}/api/local/health", 5)
+    finally:
+        t.join(5)
+        srv.close()
+    assert health is None
+    assert err == "bad answer"
+
+
+@pytest.mark.parametrize(
+    ("count", "want"), [(3, 3), (0, 0), (None, 2), ("x", 2), (True, 2), (-1, 2), (1.5, 2)], ids=str
+)
+def test_problem_count_is_the_api_figure_else_the_flagged_items(count, want):
+    h = {"items": [{"id": "a", "problem": True}, {"id": "b", "problem": True}, {"id": "c"}, "x"]}
+    if count is not None:
+        h["problemCount"] = count
+    assert problem_count(h) == want

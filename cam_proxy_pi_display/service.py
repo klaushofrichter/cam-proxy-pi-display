@@ -14,7 +14,7 @@ from collections.abc import Callable
 from datetime import datetime, tzinfo
 
 from . import fmt, localstats
-from .collector import Snapshot, fetch_health, problem_set
+from .collector import Snapshot, fetch_health, problem_set, snapshot
 from .config import Config
 from .fonts import Fonts
 from .panel import Panel
@@ -44,8 +44,7 @@ class Service:
         self.fetch = fetch or (lambda: fetch_health(cfg.api.url, cfg.api.timeout_s))
         self.local = local
         self.clock = clock
-        self.tz = tz  # None: the system's zone
-        self._system_tz = fmt.system_tz()
+        self.tz = tz or fmt.system_tz()  # with its DST rules
         self.q: queue.Queue[str] = queue.Queue()
         self.stopping = threading.Event()
         now = clock()
@@ -58,7 +57,7 @@ class Service:
 
     def local_time(self, t: float) -> datetime:
         # The zone with its DST rules, so older timestamps get their own offset.
-        return fmt.local_time(t, self.tz or self._system_tz)
+        return fmt.local_time(t, self.tz)
 
     # --- inputs ------------------------------------------------------------------------
 
@@ -71,19 +70,13 @@ class Service:
         self.q.put(STOP)
 
     def poll(self, now: float) -> Snapshot:
-        health, err = self.fetch()
-        try:
-            local = self.local()
-        except Exception:  # noqa: BLE001 (local figures are optional)
-            log.exception("reading the local figures failed")
-            local = {}
-        snap = Snapshot(health=health, error=err, fetched_at=now, local=local)
-        if health is not None:
+        snap = snapshot(self.fetch, self.local, now)
+        if snap.health is not None:
             if self.snap is not None and self.snap.health is None:
                 log.info("proxy reachable again")
             self.last_ok = snap
         elif self.snap is None or self.snap.health is not None:
-            log.warning("proxy unreachable: %s", err)
+            log.warning("proxy unreachable: %s", snap.error)
         self.snap = snap
         self.policy.observe(problem_set(snap))
         self.next_poll = now + self.cfg.api.poll_interval_s
@@ -95,14 +88,15 @@ class Service:
         assert self.snap is not None
         problems = problem_set(self.snap)
         view = View(self.snap, self.last_ok, self.policy.changing_often(now))
-        img = render(page, view, self.local_time(now), self.fonts)
         try:
+            img = render(page, view, self.local_time(now), self.fonts)
             self.panel.show(img, clear_first=clear, label=f"{page}-{reason}")
-        except Exception:  # noqa: BLE001 (keep running; the next timer tries again)
+        except Exception:  # noqa: BLE001 (keep running and the last image; tried again a minute later)
             log.exception("drawing %s (%s) failed", page, reason)
+            self.policy.failed(now)
         else:
             log.info("drew %s (%s), problems: %s", page, reason, sorted(problems) or "none")
-        self.policy.drawn(page, problems, now, reason)
+            self.policy.drawn(page, problems, now, reason)
 
     def key(self, action: str, now: float) -> None:
         page = self.policy.page if action == "update" else action
@@ -141,17 +135,20 @@ class Service:
             self.draw(due.page, due.reason, now)
 
     def run(self) -> None:
+        """The loop until a stop; the stopped page is drawn on the way out, also after a failure."""
         first = None
-        while not self.stopping.is_set():
-            self.step(first)  # first (a key that woke the wait) is drained with the rest
-            try:
-                first = self.q.get(timeout=1.0)
-            except queue.Empty:
-                first = None
-                continue
-            if first == STOP:
-                break
-        self.shutdown()
+        try:
+            while not self.stopping.is_set():
+                self.step(first)  # first (a key that woke the wait) is drained with the rest
+                try:
+                    first = self.q.get(timeout=1.0)
+                except queue.Empty:
+                    first = None
+                    continue
+                if first == STOP:
+                    break
+        finally:
+            self.shutdown()
 
     def shutdown(self) -> None:
         now = self.clock()

@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import http.client
 import json
+import logging
 import socket
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 SCHEMA = 1
 UNREACHABLE = "proxy-unreachable"
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -21,9 +26,16 @@ class Snapshot:
     fetched_at: float  # unix seconds
     local: dict = field(default_factory=dict)  # localstats.read() at the same time
 
-    @property
-    def reachable(self) -> bool:
-        return self.health is not None
+
+def snapshot(fetch: Callable[[], tuple[dict | None, str | None]], local: Callable[[], dict], now: float) -> Snapshot:
+    """Ask the proxy (`fetch`) and read the Pi's own figures (`local`, optional: a failure leaves them out)."""
+    health, err = fetch()
+    try:
+        figures = local()
+    except Exception:  # noqa: BLE001 (local figures are optional)
+        log.exception("reading the local figures failed")
+        figures = {}
+    return Snapshot(health=health, error=err, fetched_at=now, local=figures)
 
 
 def fetch_health(url: str, timeout: float) -> tuple[dict | None, str | None]:
@@ -38,6 +50,8 @@ def fetch_health(url: str, timeout: float) -> tuple[dict | None, str | None]:
         return None, _reason(e.reason)
     except OSError as e:  # TimeoutError too: _reason maps it
         return None, _reason(e)
+    except http.client.HTTPException:  # BadStatusLine, LineTooLong, IncompleteRead: not HTTP as expected
+        return None, "bad answer"
     return parse_health(body)
 
 
@@ -70,10 +84,26 @@ def _reason(r) -> str:
     return str(r)[:40] or "error"
 
 
+def valid_items(health: dict) -> list[dict]:
+    """The answer's items, without entries that are not objects."""
+    return [i for i in health.get("items", []) if isinstance(i, dict)]
+
+
+def is_problem(item: dict) -> bool:
+    """The API's problem flag (cam-proxy decides what is a problem)."""
+    return item.get("problem") is True
+
+
+def problem_count(health: dict) -> int:
+    """The answer's problemCount, else the number of items with problem: true (all of them, shown or not)."""
+    n = health.get("problemCount")
+    if isinstance(n, int) and not isinstance(n, bool) and n >= 0:
+        return n
+    return sum(1 for i in valid_items(health) if is_problem(i))
+
+
 def problem_set(snap: Snapshot) -> frozenset[str]:
     """The ids of the items with problem: true; an unreachable proxy is a problem of its own."""
     if snap.health is None:
         return frozenset({UNREACHABLE})
-    return frozenset(
-        str(i.get("id")) for i in snap.health.get("items", []) if isinstance(i, dict) and i.get("problem") is True
-    )
+    return frozenset(str(i.get("id")) for i in valid_items(snap.health) if is_problem(i))

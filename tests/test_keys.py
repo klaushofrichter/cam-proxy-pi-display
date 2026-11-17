@@ -100,3 +100,11 @@ def test_other_pins_are_configurable(mock_factory):
         assert _wait(lambda: out == ["pi"])
     finally:
         keys.close()
+
+
+def test_key_actions_name_pages_the_renderer_knows():
+    from cam_proxy_pi_display import keys, policy
+    from cam_proxy_pi_display.render import RENDERERS
+
+    assert keys.OVERVIEW == policy.OVERVIEW
+    assert {keys.OVERVIEW, *keys.PAGE_KEYS} <= set(RENDERERS)
