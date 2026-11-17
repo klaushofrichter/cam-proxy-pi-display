@@ -144,6 +144,14 @@ def _obj(x) -> dict:
     return x if isinstance(x, dict) else {}
 
 
+def _str(d: dict, key: str, default="") -> str:
+    """A text from the answer; a missing or null one (JSON null) is `default`, never "None"."""
+    v = d.get(key)
+    if v is None:
+        v = default
+    return "" if v is None else str(v)
+
+
 def _thresholds(view: View) -> dict:
     src = view.snap.health or (view.last_ok.health if view.last_ok else None) or {}
     t = dict(DEFAULT_THRESHOLDS)
@@ -227,10 +235,10 @@ def _overview(c: Canvas, view: View, now: datetime) -> None:
         return
     items = _fitting(c, valid_items(h))
     # The text column starts after the widest label (labels are shown as the API gives them).
-    widest = max((c.width(str(i.get("label", "")), c.regular) for i in items), default=0)
+    widest = max((c.width(_str(i, "label"), c.regular) for i in items), default=0)
     col = int(min(132, MARGIN + widest + 8))
     for it in items:
-        label, text, problem = str(it.get("label", "")), str(it.get("text", "")), is_problem(it)
+        label, text, problem = _str(it, "label"), _str(it, "text"), is_problem(it)
         if it.get("id") == "disk" and _num(it.get("value")):
             c.row(label, text, problem=problem, col=col, bar=(40, col - 8, float(it["value"])))
         else:
@@ -294,7 +302,7 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
     col = 80
 
     cam_item = it.get("camera", {})
-    state = str(cam_item.get("text", "online" if cam.get("online") else "offline"))
+    state = _str(cam_item, "text", "online" if cam.get("online") else "offline")
     if not cam.get("online") and cam.get("error"):
         state += f" ({cam['error']})"
     name = str(cam.get("name") or cam.get("id") or "Camera")
@@ -312,32 +320,32 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
         c.row("Address", address, col=col)
 
     st_item = it.get("stream", {})
-    st = str(st_item.get("text", ""))
+    st = _str(st_item, "text")
     if stream.get("enabled") and _num(stream.get("lastFrameAt")):
-        st += f", frame {_at(stream['lastFrameAt'], now)}"
+        st += (", " if st else "") + f"frame {_at(stream['lastFrameAt'], now)}"
     c.row("Stream", st, problem=is_problem(st_item), col=col)
 
     ev_item = it.get("events", {})
-    ev = str(ev_item.get("text", events.get("onvif", "")))
+    ev = _str(ev_item, "text", events.get("onvif", ""))
     if _num(events.get("resubscribes")):
         n = int(events["resubscribes"])
-        ev += f", {n} resubscribe{_s(n)}"
+        ev += (", " if ev else "") + f"{n} resubscribe{_s(n)}"
     c.row("Events", ev, problem=is_problem(ev_item), col=col)
 
     ftp_item = it.get("ftp", {})
     stalled = ftp.get("stalled") is True
     if ftp.get("enabled") is False:
-        c.row("FTP", str(ftp_item.get("text", "off in the proxy")), problem=is_problem(ftp_item), col=col)
+        c.row("FTP", _str(ftp_item, "text", "off in the proxy"), problem=is_problem(ftp_item), col=col)
     else:
         upload = ftp.get("cameraUpload")
-        text = str(ftp_item.get("text", "")) if not stalled else (str(upload) if upload else "")
+        text = _str(ftp_item, "text") if not stalled else (str(upload) if upload else "")
         c.row("FTP", text, problem=is_problem(ftp_item) and not stalled, col=col)
         if _num(ftp.get("lastClipAt")):
             c.row("Last clip", _at(ftp["lastClipAt"], now), col=col)
         if stalled:
             n = ftp.get("eventsWithoutClip")
             hours = _obj(h.get("thresholds")).get("ftpStalledHours")
-            stall = f"no clip for {hours} h" if _num(hours) else str(ftp_item.get("text", "stalled"))
+            stall = f"no clip for {hours} h" if _num(hours) else _str(ftp_item, "text", "stalled")
             if _num(n) and n:
                 stall += f", {int(n)} events"
             c.row("Stall check", stall, problem=True, col=col)
@@ -371,7 +379,7 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
         c.row("FTP failures", str(int(ftp["failures"])), col=col)
     storage = it.get("storage")
     if storage:
-        c.row("Storage", str(storage.get("text", "")), problem=is_problem(storage), col=col)
+        c.row("Storage", _str(storage, "text"), problem=is_problem(storage), col=col)
     cache = proxy.get("recordingsCache")
     if isinstance(cache, dict) and _num(cache.get("bytes")) and _num(cache.get("capBytes")):
         files = cache.get("files")
@@ -385,7 +393,7 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
         c.row("Retention run", _at(proxy["lastRetentionRun"], now), col=col)
     inv = it.get("inventory")
     if inv:
-        c.row("Inventory", str(inv.get("text", "")), problem=is_problem(inv), col=col)
+        c.row("Inventory", _str(inv, "text"), problem=is_problem(inv), col=col)
         last = proxy.get("lastInventory")
         if isinstance(last, dict) and _num(last.get("startedAt")):
             c.row("Inventory run", _at(last["startedAt"], now), col=col)
@@ -431,7 +439,7 @@ def _pi(c: Canvas, view: View, now: datetime) -> None:
 
     uv = it.get("underVoltage")
     if uv:
-        c.row("Under-voltage", str(uv.get("text", "")), problem=is_problem(uv), col=col)
+        c.row("Under-voltage", _str(uv, "text"), problem=is_problem(uv), col=col)
 
     _ip_row(c, loc, col)
 

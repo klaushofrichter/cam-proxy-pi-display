@@ -309,3 +309,17 @@ def test_odd_shapes_and_out_of_range_times_still_render(fonts):
     h.update(camera="x", stream=1, events=None, ftp="x", proxy=[])
     for page in ("overview", "camera", "proxy", "pi"):
         compose(page, v, NOW, fonts)
+
+
+def test_a_null_text_is_empty_not_none(fonts):
+    h = load_fixture("pi-ok")
+    for it in h["items"]:
+        it["text"] = None
+    h["items"][0]["label"] = None
+    v = View(Snapshot(h, None, FETCHED, LOCAL))
+    for page in ("overview", "camera", "proxy", "pi"):
+        drawn = compose(page, v, NOW, fonts).lines
+        assert not [line for line in drawn if "None" in line[0] or "None" in line[1]], page
+    ls = compose("camera", v, NOW, fonts).lines
+    assert ("Yard", "online", False) in ls  # the camera's own state when the item has no text
+    assert ("Stream", "frame Sat Oct 3 10:24", False) in ls  # no leading comma
