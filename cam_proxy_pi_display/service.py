@@ -91,11 +91,12 @@ class Service:
         try:
             img = render(page, view, self.local_time(now), self.fonts)
             self.panel.show(img, clear_first=clear, label=f"{page}-{reason}")
-        except Exception:  # noqa: BLE001 (keep running and the last image; the next timer tries again)
+        except Exception:  # noqa: BLE001 (keep running and the last image; tried again a minute later)
             log.exception("drawing %s (%s) failed", page, reason)
+            self.policy.failed(now)
         else:
             log.info("drew %s (%s), problems: %s", page, reason, sorted(problems) or "none")
-        self.policy.drawn(page, problems, now, reason)
+            self.policy.drawn(page, problems, now, reason)
 
     def key(self, action: str, now: float) -> None:
         page = self.policy.page if action == "update" else action

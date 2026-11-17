@@ -5,6 +5,7 @@
 - Internal cleanup, no change to the pages: one definition of a problem item and of a health snapshot, shared Pi rows, dead code removed. `--once` no longer stops with an error when the Pi's own figures can't be read; it draws without them, like the service. A `--fake-panel` run no longer keeps every drawn image in memory.
 - An answer from the proxy address that is not HTTP (a bad status line, for example) now shows as "bad answer" instead of stopping the service. If the service stops on an unexpected error, it still draws the stopped page and releases the panel.
 - A health answer of an unexpected shape (a part that is not an object, a time out of range) no longer stops the drawing loop: the pages leave such parts off or show "?", and if a page still can't be drawn the error is logged and the panel keeps its last image.
+- A draw that fails no longer counts as shown: a problem the panel could not draw is tried again a minute later (it used to wait for the 15-minute timer, and the failed draw counted against the hourly limit of problem redraws).
 
 ## v2026.10.07.1
 

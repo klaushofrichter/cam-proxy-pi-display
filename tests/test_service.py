@@ -7,6 +7,7 @@ from PIL import Image
 
 from cam_proxy_pi_display.config import Config
 from cam_proxy_pi_display.panel import FakePanel
+from cam_proxy_pi_display.policy import Draw
 from cam_proxy_pi_display.service import Service
 from tests.fixtures import load_fixture
 from tests.scenarios import FETCHED, LOCAL, TZ
@@ -173,8 +174,32 @@ def test_panel_failure_does_not_stop_the_service(tmp_path, fonts):
     panel.show = boom
     svc.step()
     clock.t += 1
-    svc.step()  # no retry storm: the failed draw counts, the timer tries again
-    assert svc.policy.last_draw_at is not None
+    svc.step()  # no retry storm: the next try comes a minute later
+    assert svc.policy.last_draw_at is None  # nothing was drawn
+    assert svc.policy.due(clock.t) is None
+    assert svc.policy.due(clock.t + MIN) == Draw("overview", "start")
+
+
+def test_a_failed_problem_draw_is_tried_again(tmp_path, fonts):
+    svc, api, panel, clock = make(tmp_path, fonts)
+    tick(svc, clock, 3)
+    api.problem(True)
+    real_show, fails = panel.show, []
+
+    def fail_once(*a, **k):
+        if not fails:
+            fails.append(k.get("label"))
+            raise OSError("spi busy")
+        real_show(*a, **k)
+
+    panel.show = fail_once
+    tick(svc, clock, 2)
+    assert fails == ["overview-problem"]
+    assert panel.count == 1  # the start draw only
+    assert svc.policy.due(clock.t) == Draw("overview", "problem")
+    tick(svc, clock, 1)
+    assert panel.count == 2
+    assert "overview-problem" in sorted(p.name for p in (tmp_path / "out").iterdir())[-2]
 
 
 def test_run_and_stop_draws_the_stopped_page(tmp_path, fonts):
