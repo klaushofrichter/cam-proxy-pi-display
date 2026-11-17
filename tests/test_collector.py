@@ -7,7 +7,15 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from cam_proxy_pi_display.collector import Snapshot, fetch_health, is_problem, problem_set, snapshot, valid_items
+from cam_proxy_pi_display.collector import (
+    Snapshot,
+    fetch_health,
+    is_problem,
+    problem_count,
+    problem_set,
+    snapshot,
+    valid_items,
+)
 from tests.fixtures import load_fixture
 
 
@@ -149,3 +157,36 @@ def test_snapshot_leaves_out_local_figures_that_fail():
 
     s = snapshot(lambda: (None, "timeout"), boom, 1.0)
     assert s == Snapshot(health=None, error="timeout", fetched_at=1.0, local={})
+
+
+def test_fetch_a_broken_http_answer_is_a_bad_answer():
+    # http.client.BadStatusLine is an HTTPException, not an OSError.
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+
+    def serve():
+        conn, _ = srv.accept()
+        with conn:
+            conn.recv(4096)
+            conn.sendall(b"GARBAGE\r\n\r\n")
+
+    t = threading.Thread(target=serve, daemon=True)
+    t.start()
+    try:
+        health, err = fetch_health(f"http://127.0.0.1:{srv.getsockname()[1]}/api/local/health", 5)
+    finally:
+        t.join(5)
+        srv.close()
+    assert health is None
+    assert err == "bad answer"
+
+
+@pytest.mark.parametrize(
+    ("count", "want"), [(3, 3), (0, 0), (None, 2), ("x", 2), (True, 2), (-1, 2), (1.5, 2)], ids=str
+)
+def test_problem_count_is_the_api_figure_else_the_flagged_items(count, want):
+    h = {"items": [{"id": "a", "problem": True}, {"id": "b", "problem": True}, {"id": "c"}, "x"]}
+    if count is not None:
+        h["problemCount"] = count
+    assert problem_count(h) == want

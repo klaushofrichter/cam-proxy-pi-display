@@ -14,7 +14,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw
 
 from . import fmt
-from .collector import Snapshot, is_problem, valid_items
+from .collector import Snapshot, is_problem, problem_count, valid_items
 from .fonts import Fonts
 
 WIDTH, HEIGHT = 264, 176
@@ -139,16 +139,32 @@ def _items(health: dict) -> dict[str, dict]:
     return {i.get("id"): i for i in valid_items(health)}
 
 
+def _obj(x) -> dict:
+    """A part of the answer that should be an object; anything else reads as empty."""
+    return x if isinstance(x, dict) else {}
+
+
+def _str(d: dict, key: str, default="") -> str:
+    """A text from the answer; a missing or null one (JSON null) is `default`, never "None"."""
+    v = d.get(key)
+    if v is None:
+        v = default
+    return "" if v is None else str(v)
+
+
 def _thresholds(view: View) -> dict:
     src = view.snap.health or (view.last_ok.health if view.last_ok else None) or {}
     t = dict(DEFAULT_THRESHOLDS)
-    t.update({k: v for k, v in (src.get("thresholds") or {}).items() if isinstance(v, (int, float))})
+    t.update({k: v for k, v in _obj(src.get("thresholds")).items() if isinstance(v, (int, float))})
     return t
 
 
 def _at(ms: int | float, now: datetime) -> str:
-    """A timestamp on a page: always the full date ("Sat Oct 3 10:25"), in now's zone."""
-    return fmt.stamp(ms, now.tzinfo)
+    """A timestamp on a page: always the full date ("Sat Oct 3 10:25"), in now's zone; "?" when out of range."""
+    try:
+        return fmt.stamp(ms, now.tzinfo)
+    except (OverflowError, ValueError, OSError):
+        return "?"
 
 
 def _fetched(snap: Snapshot, now: datetime) -> str:
@@ -219,18 +235,15 @@ def _overview(c: Canvas, view: View, now: datetime) -> None:
         return
     items = _fitting(c, valid_items(h))
     # The text column starts after the widest label (labels are shown as the API gives them).
-    widest = max((c.width(str(i.get("label", "")), c.regular) for i in items), default=0)
+    widest = max((c.width(_str(i, "label"), c.regular) for i in items), default=0)
     col = int(min(132, MARGIN + widest + 8))
     for it in items:
-        label, text, problem = str(it.get("label", "")), str(it.get("text", "")), is_problem(it)
+        label, text, problem = _str(it, "label"), _str(it, "text"), is_problem(it)
         if it.get("id") == "disk" and _num(it.get("value")):
             c.row(label, text, problem=problem, col=col, bar=(40, col - 8, float(it["value"])))
         else:
             c.row(label, text, problem=problem, col=col)
-    count = h.get("problemCount")
-    if not isinstance(count, int):
-        count = sum(1 for i in items if is_problem(i))
-    _summary(c, count, view.changing_often)
+    _summary(c, problem_count(h), view.changing_often)
 
 
 def _fitting(c: Canvas, items: list[dict]) -> list[dict]:
@@ -279,14 +292,14 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
         _unreachable_block(c, view, now)
         return
     it = _items(h)
-    cam = h.get("camera") or {}
-    stream = h.get("stream") or {}
-    events = h.get("events") or {}
-    ftp = h.get("ftp") or {}
+    cam = _obj(h.get("camera"))
+    stream = _obj(h.get("stream"))
+    events = _obj(h.get("events"))
+    ftp = _obj(h.get("ftp"))
     col = 80
 
     cam_item = it.get("camera", {})
-    state = str(cam_item.get("text", "online" if cam.get("online") else "offline"))
+    state = _str(cam_item, "text", "online" if cam.get("online") else "offline")
     if not cam.get("online") and cam.get("error"):
         state += f" ({cam['error']})"
     name = str(cam.get("name") or cam.get("id") or "Camera")
@@ -304,44 +317,37 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
         c.row("Address", address, col=col)
 
     st_item = it.get("stream", {})
-    st = str(st_item.get("text", ""))
+    st = _str(st_item, "text")
     if stream.get("enabled") and _num(stream.get("lastFrameAt")):
-        st += f", frame {_at(stream['lastFrameAt'], now)}"
+        st += (", " if st else "") + f"frame {_at(stream['lastFrameAt'], now)}"
     c.row("Stream", st, problem=is_problem(st_item), col=col)
 
     ev_item = it.get("events", {})
-    ev = str(ev_item.get("text", events.get("onvif", "")))
+    ev = _str(ev_item, "text", events.get("onvif", ""))
     if _num(events.get("resubscribes")):
         n = int(events["resubscribes"])
-        ev += f", {n} resubscribe{_s(n)}"
+        ev += (", " if ev else "") + f"{n} resubscribe{_s(n)}"
     c.row("Events", ev, problem=is_problem(ev_item), col=col)
 
     ftp_item = it.get("ftp", {})
     stalled = ftp.get("stalled") is True
     if ftp.get("enabled") is False:
-        c.row("FTP", str(ftp_item.get("text", "off in the proxy")), problem=is_problem(ftp_item), col=col)
+        c.row("FTP", _str(ftp_item, "text", "off in the proxy"), problem=is_problem(ftp_item), col=col)
     else:
         upload = ftp.get("cameraUpload")
-        text = str(ftp_item.get("text", "")) if not stalled else (str(upload) if upload else "")
+        text = _str(ftp_item, "text") if not stalled else (str(upload) if upload else "")
         c.row("FTP", text, problem=is_problem(ftp_item) and not stalled, col=col)
         if _num(ftp.get("lastClipAt")):
             c.row("Last clip", _at(ftp["lastClipAt"], now), col=col)
         if stalled:
             n = ftp.get("eventsWithoutClip")
-            hours = (h.get("thresholds") or {}).get("ftpStalledHours")
-            stall = f"no clip for {hours} h" if _num(hours) else str(ftp_item.get("text", "stalled"))
+            hours = _obj(h.get("thresholds")).get("ftpStalledHours")
+            stall = f"no clip for {hours} h" if _num(hours) else _str(ftp_item, "text", "stalled")
             if _num(n) and n:
                 stall += f", {int(n)} events"
             c.row("Stall check", stall, problem=True, col=col)
         else:
             c.row("Stall check", "ok", col=col)
-
-    poe = cam.get("poeSwitch")
-    if isinstance(poe, dict) and poe.get("model"):
-        text = str(poe["model"])
-        if _num(poe.get("port")):
-            text += f" port {int(poe['port'])}"
-        c.row("PoE switch", text, col=col)
 
 
 def _proxy(c: Canvas, view: View, now: datetime) -> None:
@@ -352,8 +358,8 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
         _unreachable_rows(c, view, now, col=col)
         return
     it = _items(h)
-    proxy = h.get("proxy") or {}
-    ftp = h.get("ftp") or {}
+    proxy = _obj(h.get("proxy"))
+    ftp = _obj(h.get("ftp"))
     c.row("Version", str(h.get("version", "?")), bold=True, col=col)
     if _num(h.get("startedAt")):
         c.row("Up since", _at(h["startedAt"], now), col=col)
@@ -363,7 +369,7 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
         c.row("FTP failures", str(int(ftp["failures"])), col=col)
     storage = it.get("storage")
     if storage:
-        c.row("Storage", str(storage.get("text", "")), problem=is_problem(storage), col=col)
+        c.row("Storage", _str(storage, "text"), problem=is_problem(storage), col=col)
     cache = proxy.get("recordingsCache")
     if isinstance(cache, dict) and _num(cache.get("bytes")) and _num(cache.get("capBytes")):
         files = cache.get("files")
@@ -377,7 +383,7 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
         c.row("Retention run", _at(proxy["lastRetentionRun"], now), col=col)
     inv = it.get("inventory")
     if inv:
-        c.row("Inventory", str(inv.get("text", "")), problem=is_problem(inv), col=col)
+        c.row("Inventory", _str(inv, "text"), problem=is_problem(inv), col=col)
         last = proxy.get("lastInventory")
         if isinstance(last, dict) and _num(last.get("startedAt")):
             c.row("Inventory run", _at(last["startedAt"], now), col=col)
@@ -388,8 +394,8 @@ def _pi(c: Canvas, view: View, now: datetime) -> None:
     loc = view.snap.local or {}
     col = 100
     th = _thresholds(view)
-    platform = (h or {}).get("platform") or {}
-    host = (h or {}).get("host") or {}
+    platform = _obj((h or {}).get("platform"))
+    host = _obj((h or {}).get("host"))
     it = _items(h) if h else {}
 
     model = platform.get("model") or loc.get("model")
@@ -423,7 +429,7 @@ def _pi(c: Canvas, view: View, now: datetime) -> None:
 
     uv = it.get("underVoltage")
     if uv:
-        c.row("Under-voltage", str(uv.get("text", "")), problem=is_problem(uv), col=col)
+        c.row("Under-voltage", _str(uv, "text"), problem=is_problem(uv), col=col)
 
     _ip_row(c, loc, col)
 
@@ -441,7 +447,7 @@ def _stopped(c: Canvas, view: View, now: datetime) -> None:
     c.row("is not running.")
     snap = view.snap if view.snap.health is not None else view.last_ok
     if snap is not None and snap.health is not None:
-        state = _state(snap.health.get("problemCount", 0))
+        state = _state(problem_count(snap.health))
         c.footer(f"Last data {_fetched(snap, now)}: {state}", bold=False)
     else:
         c.footer("Last data: proxy unreachable", bold=False)

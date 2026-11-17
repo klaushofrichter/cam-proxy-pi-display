@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import socket
@@ -49,6 +50,8 @@ def fetch_health(url: str, timeout: float) -> tuple[dict | None, str | None]:
         return None, _reason(e.reason)
     except OSError as e:  # TimeoutError too: _reason maps it
         return None, _reason(e)
+    except http.client.HTTPException:  # BadStatusLine, LineTooLong, IncompleteRead: not HTTP as expected
+        return None, "bad answer"
     return parse_health(body)
 
 
@@ -89,6 +92,14 @@ def valid_items(health: dict) -> list[dict]:
 def is_problem(item: dict) -> bool:
     """The API's problem flag (cam-proxy decides what is a problem)."""
     return item.get("problem") is True
+
+
+def problem_count(health: dict) -> int:
+    """The answer's problemCount, else the number of items with problem: true (all of them, shown or not)."""
+    n = health.get("problemCount")
+    if isinstance(n, int) and not isinstance(n, bool) and n >= 0:
+        return n
+    return sum(1 for i in valid_items(health) if is_problem(i))
 
 
 def problem_set(snap: Snapshot) -> frozenset[str]:

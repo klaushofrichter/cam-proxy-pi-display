@@ -9,7 +9,8 @@ The rules (design, "Refresh policy"):
   hour; past that only the timer draws and the Overview says "changing often";
 - keys draw at once (the caller does that and reports it with `drawn(..., "key")`);
   `return_to_overview_min` after a key the Overview comes back;
-- a full clear once a day at `daily_clear` (local time) against ghosting.
+- a full clear once a day at `daily_clear` (local time) against ghosting;
+- a draw that failed is not counted as shown: what was due is tried again `RETRY_S` later.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from .config import RefreshConfig, parse_hhmm
 
 OVERVIEW = "overview"
 HOUR = 3600.0
+RETRY_S = 60.0
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,7 @@ class RefreshPolicy:
         self._problem_draws: deque[float] = deque()
         self._clear_hm = parse_hhmm(cfg.daily_clear)
         self._last_clear: date | None = None
+        self._failed_at: float | None = None
         if local_now is not None:
             today_clear = local_now.replace(hour=self._clear_hm[0], minute=self._clear_hm[1], second=0, microsecond=0)
             self._last_clear = local_now.date() if local_now >= today_clear else local_now.date() - timedelta(days=1)
@@ -61,6 +64,7 @@ class RefreshPolicy:
 
     def drawn(self, page: str, problems: frozenset[str] | None, now: float, reason: str) -> None:
         """The panel now shows `page` drawn from data with these problems."""
+        self._failed_at = None
         self.page = page
         self.last_draw_at = now
         self.shown = problems
@@ -70,6 +74,10 @@ class RefreshPolicy:
             self.key_at = None
         if reason == "problem":
             self._problem_draws.append(now)
+
+    def failed(self, now: float) -> None:
+        """A draw did not reach the panel: nothing is recorded as shown, and the next try waits."""
+        self._failed_at = now
 
     def cleared(self, local_now: datetime) -> None:
         self._last_clear = local_now.date()
@@ -89,6 +97,8 @@ class RefreshPolicy:
         return self.confirmed is not None and self.latest == self.confirmed and self.confirmed != self.shown
 
     def due(self, now: float) -> Draw | None:
+        if self._failed_at is not None and now - self._failed_at < RETRY_S:
+            return None
         if self.last_draw_at is None:
             return Draw(OVERVIEW, "start")
         if self.problem_pending() and not self.changing_often(now):

@@ -88,14 +88,15 @@ class Service:
         assert self.snap is not None
         problems = problem_set(self.snap)
         view = View(self.snap, self.last_ok, self.policy.changing_often(now))
-        img = render(page, view, self.local_time(now), self.fonts)
         try:
+            img = render(page, view, self.local_time(now), self.fonts)
             self.panel.show(img, clear_first=clear, label=f"{page}-{reason}")
-        except Exception:  # noqa: BLE001 (keep running; the next timer tries again)
+        except Exception:  # noqa: BLE001 (keep running and the last image; tried again a minute later)
             log.exception("drawing %s (%s) failed", page, reason)
+            self.policy.failed(now)
         else:
             log.info("drew %s (%s), problems: %s", page, reason, sorted(problems) or "none")
-        self.policy.drawn(page, problems, now, reason)
+            self.policy.drawn(page, problems, now, reason)
 
     def key(self, action: str, now: float) -> None:
         page = self.policy.page if action == "update" else action
@@ -134,17 +135,20 @@ class Service:
             self.draw(due.page, due.reason, now)
 
     def run(self) -> None:
+        """The loop until a stop; the stopped page is drawn on the way out, also after a failure."""
         first = None
-        while not self.stopping.is_set():
-            self.step(first)  # first (a key that woke the wait) is drained with the rest
-            try:
-                first = self.q.get(timeout=1.0)
-            except queue.Empty:
-                first = None
-                continue
-            if first == STOP:
-                break
-        self.shutdown()
+        try:
+            while not self.stopping.is_set():
+                self.step(first)  # first (a key that woke the wait) is drained with the rest
+                try:
+                    first = self.q.get(timeout=1.0)
+                except queue.Empty:
+                    first = None
+                    continue
+                if first == STOP:
+                    break
+        finally:
+            self.shutdown()
 
     def shutdown(self) -> None:
         now = self.clock()

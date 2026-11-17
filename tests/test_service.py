@@ -2,10 +2,12 @@ import copy
 import threading
 import time
 
+import pytest
 from PIL import Image
 
 from cam_proxy_pi_display.config import Config
 from cam_proxy_pi_display.panel import FakePanel
+from cam_proxy_pi_display.policy import Draw
 from cam_proxy_pi_display.service import Service
 from tests.fixtures import load_fixture
 from tests.scenarios import FETCHED, LOCAL, TZ
@@ -172,8 +174,32 @@ def test_panel_failure_does_not_stop_the_service(tmp_path, fonts):
     panel.show = boom
     svc.step()
     clock.t += 1
-    svc.step()  # no retry storm: the failed draw counts, the timer tries again
-    assert svc.policy.last_draw_at is not None
+    svc.step()  # no retry storm: the next try comes a minute later
+    assert svc.policy.last_draw_at is None  # nothing was drawn
+    assert svc.policy.due(clock.t) is None
+    assert svc.policy.due(clock.t + MIN) == Draw("overview", "start")
+
+
+def test_a_failed_problem_draw_is_tried_again(tmp_path, fonts):
+    svc, api, panel, clock = make(tmp_path, fonts)
+    tick(svc, clock, 3)
+    api.problem(True)
+    real_show, fails = panel.show, []
+
+    def fail_once(*a, **k):
+        if not fails:
+            fails.append(k.get("label"))
+            raise OSError("spi busy")
+        real_show(*a, **k)
+
+    panel.show = fail_once
+    tick(svc, clock, 2)
+    assert fails == ["overview-problem"]
+    assert panel.count == 1  # the start draw only
+    assert svc.policy.due(clock.t) == Draw("overview", "problem")
+    tick(svc, clock, 1)
+    assert panel.count == 2
+    assert "overview-problem" in sorted(p.name for p in (tmp_path / "out").iterdir())[-2]
 
 
 def test_run_and_stop_draws_the_stopped_page(tmp_path, fonts):
@@ -232,3 +258,54 @@ def test_run_draws_a_key_press(tmp_path, fonts):
     assert svc.policy.page == "camera"
     names = [p.name.split("-", 2)[2] for p in sorted((tmp_path / "out").glob("0*.png"))]
     assert names == ["overview-start.png", "camera-key.png", "stopped.png"]
+
+
+def test_run_draws_the_stopped_page_when_the_loop_fails(tmp_path, fonts):
+    svc, api, panel, clock = make(tmp_path, fonts)
+    closed = []
+    panel.close = lambda: closed.append(True)
+
+    def boom():
+        raise RuntimeError("unexpected")
+
+    svc.fetch = boom
+    with pytest.raises(RuntimeError):
+        svc.run()
+    assert closed == [True]
+    assert sorted((tmp_path / "out").glob("*-stopped.png"))
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda h: h.update(camera="x"),
+        lambda h: h["camera"].update(since=1e20),
+    ],
+    ids=["camera-not-an-object", "since-out-of-range"],
+)
+def test_odd_health_shapes_still_draw_the_camera_page(tmp_path, fonts, change):
+    svc, api, panel, clock = make(tmp_path, fonts)
+    change(api.health)
+    svc.step()
+    svc.press("camera")
+    svc.step()
+    assert panel.count == 2
+    assert svc.policy.page == "camera"
+
+
+def test_a_render_failure_is_logged_and_the_loop_goes_on(tmp_path, fonts, monkeypatch, caplog):
+    from cam_proxy_pi_display import service as service_mod
+
+    svc, api, panel, clock = make(tmp_path, fonts)
+
+    def boom(*a, **k):
+        raise AttributeError("odd health")
+
+    monkeypatch.setattr(service_mod, "render", boom)
+    svc.step()  # no exception
+    assert panel.count == 0
+    assert "drawing overview (start) failed" in caplog.text
+    monkeypatch.undo()
+    clock.t += 15 * MIN
+    svc.step()
+    assert panel.count == 1
