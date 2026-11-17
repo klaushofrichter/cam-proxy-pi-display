@@ -248,3 +248,39 @@ def test_run_draws_the_stopped_page_when_the_loop_fails(tmp_path, fonts):
         svc.run()
     assert closed == [True]
     assert sorted((tmp_path / "out").glob("*-stopped.png"))
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda h: h.update(camera="x"),
+        lambda h: h["camera"].update(since=1e20),
+    ],
+    ids=["camera-not-an-object", "since-out-of-range"],
+)
+def test_odd_health_shapes_still_draw_the_camera_page(tmp_path, fonts, change):
+    svc, api, panel, clock = make(tmp_path, fonts)
+    change(api.health)
+    svc.step()
+    svc.press("camera")
+    svc.step()
+    assert panel.count == 2
+    assert svc.policy.page == "camera"
+
+
+def test_a_render_failure_is_logged_and_the_loop_goes_on(tmp_path, fonts, monkeypatch, caplog):
+    from cam_proxy_pi_display import service as service_mod
+
+    svc, api, panel, clock = make(tmp_path, fonts)
+
+    def boom(*a, **k):
+        raise AttributeError("odd health")
+
+    monkeypatch.setattr(service_mod, "render", boom)
+    svc.step()  # no exception
+    assert panel.count == 0
+    assert "drawing overview (start) failed" in caplog.text
+    monkeypatch.undo()
+    clock.t += 15 * MIN
+    svc.step()
+    assert panel.count == 1

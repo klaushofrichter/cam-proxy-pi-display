@@ -88,10 +88,10 @@ class Service:
         assert self.snap is not None
         problems = problem_set(self.snap)
         view = View(self.snap, self.last_ok, self.policy.changing_often(now))
-        img = render(page, view, self.local_time(now), self.fonts)
         try:
+            img = render(page, view, self.local_time(now), self.fonts)
             self.panel.show(img, clear_first=clear, label=f"{page}-{reason}")
-        except Exception:  # noqa: BLE001 (keep running; the next timer tries again)
+        except Exception:  # noqa: BLE001 (keep running and the last image; the next timer tries again)
             log.exception("drawing %s (%s) failed", page, reason)
         else:
             log.info("drew %s (%s), problems: %s", page, reason, sorted(problems) or "none")

@@ -296,3 +296,16 @@ def test_disk_and_temp_problem_api_flag_else_threshold():
     assert _disk_problem(50, th, {}) is False
     assert _disk_problem(95, th, {"disk": {"id": "disk", "problem": False}}) is False
     assert _disk_problem(50, th, {"disk": {"id": "disk", "problem": True}}) is True
+
+
+def test_odd_shapes_and_out_of_range_times_still_render(fonts):
+    h = load_fixture("pi-ok")
+    h["camera"]["since"] = 1e20
+    h["thresholds"] = "x"
+    h["host"] = ["x"]
+    v = View(Snapshot(h, None, FETCHED, LOCAL))
+    assert ("Since", "?", False) in compose("camera", v, NOW, fonts).lines
+    compose("pi", v, NOW, fonts)
+    h.update(camera="x", stream=1, events=None, ftp="x", proxy=[])
+    for page in ("overview", "camera", "proxy", "pi"):
+        compose(page, v, NOW, fonts)

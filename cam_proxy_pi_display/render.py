@@ -139,16 +139,24 @@ def _items(health: dict) -> dict[str, dict]:
     return {i.get("id"): i for i in valid_items(health)}
 
 
+def _obj(x) -> dict:
+    """A part of the answer that should be an object; anything else reads as empty."""
+    return x if isinstance(x, dict) else {}
+
+
 def _thresholds(view: View) -> dict:
     src = view.snap.health or (view.last_ok.health if view.last_ok else None) or {}
     t = dict(DEFAULT_THRESHOLDS)
-    t.update({k: v for k, v in (src.get("thresholds") or {}).items() if isinstance(v, (int, float))})
+    t.update({k: v for k, v in _obj(src.get("thresholds")).items() if isinstance(v, (int, float))})
     return t
 
 
 def _at(ms: int | float, now: datetime) -> str:
-    """A timestamp on a page: always the full date ("Sat Oct 3 10:25"), in now's zone."""
-    return fmt.stamp(ms, now.tzinfo)
+    """A timestamp on a page: always the full date ("Sat Oct 3 10:25"), in now's zone; "?" when out of range."""
+    try:
+        return fmt.stamp(ms, now.tzinfo)
+    except (OverflowError, ValueError, OSError):
+        return "?"
 
 
 def _fetched(snap: Snapshot, now: datetime) -> str:
@@ -279,10 +287,10 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
         _unreachable_block(c, view, now)
         return
     it = _items(h)
-    cam = h.get("camera") or {}
-    stream = h.get("stream") or {}
-    events = h.get("events") or {}
-    ftp = h.get("ftp") or {}
+    cam = _obj(h.get("camera"))
+    stream = _obj(h.get("stream"))
+    events = _obj(h.get("events"))
+    ftp = _obj(h.get("ftp"))
     col = 80
 
     cam_item = it.get("camera", {})
@@ -328,7 +336,7 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
             c.row("Last clip", _at(ftp["lastClipAt"], now), col=col)
         if stalled:
             n = ftp.get("eventsWithoutClip")
-            hours = (h.get("thresholds") or {}).get("ftpStalledHours")
+            hours = _obj(h.get("thresholds")).get("ftpStalledHours")
             stall = f"no clip for {hours} h" if _num(hours) else str(ftp_item.get("text", "stalled"))
             if _num(n) and n:
                 stall += f", {int(n)} events"
@@ -352,8 +360,8 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
         _unreachable_rows(c, view, now, col=col)
         return
     it = _items(h)
-    proxy = h.get("proxy") or {}
-    ftp = h.get("ftp") or {}
+    proxy = _obj(h.get("proxy"))
+    ftp = _obj(h.get("ftp"))
     c.row("Version", str(h.get("version", "?")), bold=True, col=col)
     if _num(h.get("startedAt")):
         c.row("Up since", _at(h["startedAt"], now), col=col)
@@ -388,8 +396,8 @@ def _pi(c: Canvas, view: View, now: datetime) -> None:
     loc = view.snap.local or {}
     col = 100
     th = _thresholds(view)
-    platform = (h or {}).get("platform") or {}
-    host = (h or {}).get("host") or {}
+    platform = _obj((h or {}).get("platform"))
+    host = _obj((h or {}).get("host"))
     it = _items(h) if h else {}
 
     model = platform.get("model") or loc.get("model")
