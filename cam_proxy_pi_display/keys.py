@@ -11,12 +11,12 @@ import logging
 from collections.abc import Callable
 
 from .config import KeysConfig
+from .policy import OVERVIEW
 
 log = logging.getLogger(__name__)
 
 PAGE_KEYS = ("camera", "proxy", "pi")
 UPDATE = "update"
-OVERVIEW = "overview"
 
 
 class KeyLogic:

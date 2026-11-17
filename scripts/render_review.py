@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -24,17 +25,15 @@ from tests.scenarios import GOLDEN, NOW, REVIEW, view  # noqa: E402
 
 
 def main() -> int:
-    import os
-
-    local_fonts = ROOT / ".fonts"
-    if "CPPD_FONTS_DIR" not in os.environ and (local_fonts / "DejaVuSans.ttf").is_file():
-        os.environ["CPPD_FONTS_DIR"] = str(local_fonts)
     ap = argparse.ArgumentParser()
     ap.add_argument("out", type=Path)
     ap.add_argument("--scale", type=int, default=3)
     ap.add_argument("--all", action="store_true")
     args = ap.parse_args()
-    fonts = Fonts()
+    local_fonts = ROOT / ".fonts"
+    # CPPD_FONTS_DIR wins (Fonts checks it after an explicit directory), then .fonts/.
+    use_local = not os.environ.get("CPPD_FONTS_DIR") and (local_fonts / "DejaVuSans.ttf").is_file()
+    fonts = Fonts(str(local_fonts) if use_local else "")
     if fonts.dir is None:
         print("DejaVu fonts not found", file=sys.stderr)
         return 1

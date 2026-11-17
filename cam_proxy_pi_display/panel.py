@@ -63,13 +63,11 @@ class FakePanel:
         self.count = 0
         self.clears = 0
         self._clock = clock
-        self.images: list[Image.Image] = []
 
     def show(self, image: Image.Image, *, clear_first: bool = False, label: str = "page") -> None:
         self.count += 1
         if clear_first:
             self.clears += 1
-        self.images.append(image.copy())
         stamp = datetime.fromtimestamp(self._clock()).strftime("%H%M%S")
         name = f"{self.count:04d}-{stamp}-{label}{'-clear' if clear_first else ''}.png"
         image.save(self.dir / name)

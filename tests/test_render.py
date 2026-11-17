@@ -277,3 +277,22 @@ def test_stopped_page_summary(count, state, fonts):
         h["problemCount"] = count
     ls = compose("stopped", View(Snapshot(h, None, FETCHED, LOCAL)), NOW, fonts).lines
     assert ls[-1] == (f"Last data Sat Oct 3 10:25: {state}", "", False)
+
+
+def test_disk_percent_only_from_a_number():
+    from cam_proxy_pi_display.render import _disk_percent
+
+    assert _disk_percent({"usedPercent": 41}) == 41.0
+    assert _disk_percent({"usedPercent": True}) is None
+    assert _disk_percent({"usedPercent": None}) is None
+    assert _disk_percent(None) is None
+
+
+def test_disk_and_temp_problem_api_flag_else_threshold():
+    from cam_proxy_pi_display.render import _disk_problem
+
+    th = {"diskPercent": 90, "tempC": 75}
+    assert _disk_problem(95, th, {}) is True
+    assert _disk_problem(50, th, {}) is False
+    assert _disk_problem(95, th, {"disk": {"id": "disk", "problem": False}}) is False
+    assert _disk_problem(50, th, {"disk": {"id": "disk", "problem": True}}) is True

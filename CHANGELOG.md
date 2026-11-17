@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Internal cleanup, no change to the pages: one definition of a problem item and of a health snapshot, shared Pi rows, dead code removed. `--once` no longer stops with an error when the Pi's own figures can't be read; it draws without them, like the service. A `--fake-panel` run no longer keeps every drawn image in memory.
+
 ## v2026.10.07.1
 
 - The Overview keeps its summary line ("All OK" / "N problems") when cam-proxy lists more items than fit: the last items without a problem give way (the version first; it is on the Proxy page). cam-proxy's Archive item already made 11 items on the Pi, which pushed the summary off the screen; its SD card item (cam-proxy #199) makes 12.

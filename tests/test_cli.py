@@ -83,3 +83,25 @@ def test_service_stops_on_sigterm_with_the_stopped_page(tmp_path, fonts):
     assert proc.returncode == 0, err
     assert list(out.glob("*-stopped.png"))
     assert "proxy unreachable" in err
+
+
+def test_once_survives_a_failing_local_reading(tmp_path, fonts, monkeypatch):
+    def boom():
+        raise OSError("no /proc here")
+
+    monkeypatch.setattr("cam_proxy_pi_display.localstats.read", boom)
+    out = tmp_path / "out"
+    rc = main(
+        [
+            "--config",
+            str(unreachable_config(tmp_path)),
+            "--fake-panel",
+            str(out),
+            "--once",
+            "pi",
+            "--health-file",
+            str(FIXTURES / "pi-ok.json"),
+        ]
+    )
+    assert rc == 0
+    assert len(list(out.glob("0001-*-pi.png"))) == 1

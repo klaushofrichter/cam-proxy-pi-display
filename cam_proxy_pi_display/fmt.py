@@ -22,7 +22,7 @@ def stamp(t: int | float | datetime, tz: tzinfo | None = None) -> str:
     The screen may be read a day or more after it was drawn, so every time carries its date.
     """
     if not isinstance(t, datetime):
-        t = datetime.fromtimestamp(t / 1000, tz or system_tz())
+        t = local_time(t / 1000, tz)
     return f"{DAYS[t.weekday()]} {MONTHS[t.month - 1]} {t.day} {hhmm(t)}"
 
 
