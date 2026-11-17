@@ -44,8 +44,7 @@ class Service:
         self.fetch = fetch or (lambda: fetch_health(cfg.api.url, cfg.api.timeout_s))
         self.local = local
         self.clock = clock
-        self.tz = tz  # None: the system's zone
-        self._system_tz = fmt.system_tz()
+        self.tz = tz or fmt.system_tz()  # with its DST rules
         self.q: queue.Queue[str] = queue.Queue()
         self.stopping = threading.Event()
         now = clock()
@@ -58,7 +57,7 @@ class Service:
 
     def local_time(self, t: float) -> datetime:
         # The zone with its DST rules, so older timestamps get their own offset.
-        return fmt.local_time(t, self.tz or self._system_tz)
+        return fmt.local_time(t, self.tz)
 
     # --- inputs ------------------------------------------------------------------------
 

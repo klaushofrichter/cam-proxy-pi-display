@@ -92,12 +92,12 @@ class Canvas:
         if problem:
             self.d.rectangle((0, self.y, WIDTH - 1, self.y + ROW_H - 1), fill=BLACK)
         base = self.y + 11
-        lab_font = self.bold if bold else self.regular
+        font = self.bold if bold else self.regular
         if text or bar:
-            label = self.fit(label, lab_font, (bar[0] if bar else col) - MARGIN - 4)
+            label = self.fit(label, font, (bar[0] if bar else col) - MARGIN - 4)
         else:
-            label = self.fit(label, lab_font, WIDTH - 2 * MARGIN)
-        self.d.text((MARGIN, base), label, font=lab_font, fill=fg, anchor="ls")
+            label = self.fit(label, font, WIDTH - 2 * MARGIN)
+        self.d.text((MARGIN, base), label, font=font, fill=fg, anchor="ls")
         if bar:
             x0, x1, pct = bar
             top, bottom = self.y + 3, self.y + ROW_H - 4
@@ -106,7 +106,6 @@ class Canvas:
             if fill_to > x0:
                 self.d.rectangle((x0, top, fill_to, bottom), fill=fg)
         if text:
-            font = self.bold if bold else self.regular
             self.d.text((col, base), self.fit(text, font, WIDTH - MARGIN - col), font=font, fill=fg, anchor="ls")
         self.y += ROW_H
 
@@ -441,7 +440,7 @@ def _stopped(c: Canvas, view: View, now: datetime) -> None:
     if snap is not None and snap.health is not None:
         state = _state(snap.health.get("problemCount", 0))
         c.footer(f"Last data {_fetched(snap, now)}: {state}", bold=False)
-    elif view.snap.health is None:
+    else:
         c.footer("Last data: proxy unreachable", bold=False)
 
 

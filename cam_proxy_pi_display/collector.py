@@ -21,10 +21,6 @@ class Snapshot:
     fetched_at: float  # unix seconds
     local: dict = field(default_factory=dict)  # localstats.read() at the same time
 
-    @property
-    def reachable(self) -> bool:
-        return self.health is not None
-
 
 def fetch_health(url: str, timeout: float) -> tuple[dict | None, str | None]:
     """GET the health answer. Returns (health, None) or (None, short reason)."""
