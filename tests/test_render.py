@@ -135,7 +135,6 @@ def test_camera_page(fonts):
     assert ("Last clip", "Sat Oct 3 09:53", False) in ls
     assert ("Firmware", "v3.1.0.4054_2409213180", False) in ls
     assert ("Stall check", "ok", False) in ls
-    assert ("PoE switch", "sscpoe-web port 8", False) in ls
     ls = compose("camera", view("problems"), NOW, fonts).lines
     assert ("Yard", "offline (timeout)", True) in ls
     assert ("Since", "Sat Oct 3 10:13", False) in ls
@@ -148,12 +147,12 @@ def test_camera_page(fonts):
 
 def test_null_figures_are_left_off(fonts):
     h = load_fixture("pi-ok")
-    h["camera"].update(model=None, firmware=None, clockOffsetMs=None, poeSwitch=None)
+    h["camera"].update(model=None, firmware=None, clockOffsetMs=None)
     h["host"].update(memory=None, load=None, cpuTempC=None)
     h["startedAt"] = None
     v = View(Snapshot(h, None, FETCHED, {}))
     cam = labels(compose("camera", v, NOW, fonts).lines)
-    assert not {"Model", "Firmware", "PoE switch"} & set(cam)
+    assert not {"Model", "Firmware"} & set(cam)
     assert ("Address", "192.0.2.10", False) in compose("camera", v, NOW, fonts).lines
     pi = labels(compose("pi", v, NOW, fonts).lines)
     assert not {"Memory", "Load", "CPU temp", "IP address"} & set(pi)
@@ -323,3 +322,12 @@ def test_a_null_text_is_empty_not_none(fonts):
     ls = compose("camera", v, NOW, fonts).lines
     assert ("Yard", "online", False) in ls  # the camera's own state when the item has no text
     assert ("Stream", "frame Sat Oct 3 10:24", False) in ls  # no leading comma
+
+
+def test_camera_page_has_no_poe_switch_row(fonts):
+    # The switch data moved to cams-admin; cam-proxy sends camera.poeSwitch = null.
+    h = load_fixture("pi-ok")
+    for poe in (None, {"model": "sscpoe-web", "port": 8}, "x"):
+        h["camera"]["poeSwitch"] = poe
+        ls = compose("camera", View(Snapshot(h, None, FETCHED, LOCAL)), NOW, fonts).lines
+        assert "PoE switch" not in labels(ls)

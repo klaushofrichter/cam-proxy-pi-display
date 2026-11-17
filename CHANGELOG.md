@@ -7,6 +7,7 @@
 - A health answer of an unexpected shape (a part that is not an object, a time out of range) no longer stops the drawing loop: the pages leave such parts off or show "?", and if a page still can't be drawn the error is logged and the panel keeps its last image.
 - A draw that fails no longer counts as shown: a problem the panel could not draw is tried again a minute later (it used to wait for the 15-minute timer, and the failed draw counted against the hourly limit of problem redraws).
 - A null text or label in cam-proxy's answer shows as empty (or the page's own fallback, such as the camera's online state) instead of the word "None".
+- The Camera page no longer has a "PoE switch" row: cam-proxy no longer sends the switch (it moved to cams-admin), so the row was never shown.
 
 ## v2026.10.07.1
 

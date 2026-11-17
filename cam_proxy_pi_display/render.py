@@ -352,13 +352,6 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
         else:
             c.row("Stall check", "ok", col=col)
 
-    poe = cam.get("poeSwitch")
-    if isinstance(poe, dict) and poe.get("model"):
-        text = str(poe["model"])
-        if _num(poe.get("port")):
-            text += f" port {int(poe['port'])}"
-        c.row("PoE switch", text, col=col)
-
 
 def _proxy(c: Canvas, view: View, now: datetime) -> None:
     h = view.snap.health
