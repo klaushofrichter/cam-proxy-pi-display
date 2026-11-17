@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.client
 import json
 import logging
 import socket
@@ -49,6 +50,8 @@ def fetch_health(url: str, timeout: float) -> tuple[dict | None, str | None]:
         return None, _reason(e.reason)
     except OSError as e:  # TimeoutError too: _reason maps it
         return None, _reason(e)
+    except http.client.HTTPException:  # BadStatusLine, LineTooLong, IncompleteRead: not HTTP as expected
+        return None, "bad answer"
     return parse_health(body)
 
 

@@ -149,3 +149,26 @@ def test_snapshot_leaves_out_local_figures_that_fail():
 
     s = snapshot(lambda: (None, "timeout"), boom, 1.0)
     assert s == Snapshot(health=None, error="timeout", fetched_at=1.0, local={})
+
+
+def test_fetch_a_broken_http_answer_is_a_bad_answer():
+    # http.client.BadStatusLine is an HTTPException, not an OSError.
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+
+    def serve():
+        conn, _ = srv.accept()
+        with conn:
+            conn.recv(4096)
+            conn.sendall(b"GARBAGE\r\n\r\n")
+
+    t = threading.Thread(target=serve, daemon=True)
+    t.start()
+    try:
+        health, err = fetch_health(f"http://127.0.0.1:{srv.getsockname()[1]}/api/local/health", 5)
+    finally:
+        t.join(5)
+        srv.close()
+    assert health is None
+    assert err == "bad answer"

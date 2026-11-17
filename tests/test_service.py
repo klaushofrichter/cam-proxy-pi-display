@@ -2,6 +2,7 @@ import copy
 import threading
 import time
 
+import pytest
 from PIL import Image
 
 from cam_proxy_pi_display.config import Config
@@ -232,3 +233,18 @@ def test_run_draws_a_key_press(tmp_path, fonts):
     assert svc.policy.page == "camera"
     names = [p.name.split("-", 2)[2] for p in sorted((tmp_path / "out").glob("0*.png"))]
     assert names == ["overview-start.png", "camera-key.png", "stopped.png"]
+
+
+def test_run_draws_the_stopped_page_when_the_loop_fails(tmp_path, fonts):
+    svc, api, panel, clock = make(tmp_path, fonts)
+    closed = []
+    panel.close = lambda: closed.append(True)
+
+    def boom():
+        raise RuntimeError("unexpected")
+
+    svc.fetch = boom
+    with pytest.raises(RuntimeError):
+        svc.run()
+    assert closed == [True]
+    assert sorted((tmp_path / "out").glob("*-stopped.png"))

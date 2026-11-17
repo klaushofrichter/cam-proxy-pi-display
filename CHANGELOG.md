@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Internal cleanup, no change to the pages: one definition of a problem item and of a health snapshot, shared Pi rows, dead code removed. `--once` no longer stops with an error when the Pi's own figures can't be read; it draws without them, like the service. A `--fake-panel` run no longer keeps every drawn image in memory.
+- An answer from the proxy address that is not HTTP (a bad status line, for example) now shows as "bad answer" instead of stopping the service. If the service stops on an unexpected error, it still draws the stopped page and releases the panel.
 
 ## v2026.10.07.1
 

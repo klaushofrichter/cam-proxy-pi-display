@@ -134,17 +134,20 @@ class Service:
             self.draw(due.page, due.reason, now)
 
     def run(self) -> None:
+        """The loop until a stop; the stopped page is drawn on the way out, also after a failure."""
         first = None
-        while not self.stopping.is_set():
-            self.step(first)  # first (a key that woke the wait) is drained with the rest
-            try:
-                first = self.q.get(timeout=1.0)
-            except queue.Empty:
-                first = None
-                continue
-            if first == STOP:
-                break
-        self.shutdown()
+        try:
+            while not self.stopping.is_set():
+                self.step(first)  # first (a key that woke the wait) is drained with the rest
+                try:
+                    first = self.q.get(timeout=1.0)
+                except queue.Empty:
+                    first = None
+                    continue
+                if first == STOP:
+                    break
+        finally:
+            self.shutdown()
 
     def shutdown(self) -> None:
         now = self.clock()
