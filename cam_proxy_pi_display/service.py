@@ -14,7 +14,7 @@ from collections.abc import Callable
 from datetime import datetime, tzinfo
 
 from . import fmt, localstats
-from .collector import Snapshot, fetch_health, problem_set
+from .collector import Snapshot, fetch_health, problem_set, snapshot
 from .config import Config
 from .fonts import Fonts
 from .panel import Panel
@@ -70,19 +70,13 @@ class Service:
         self.q.put(STOP)
 
     def poll(self, now: float) -> Snapshot:
-        health, err = self.fetch()
-        try:
-            local = self.local()
-        except Exception:  # noqa: BLE001 (local figures are optional)
-            log.exception("reading the local figures failed")
-            local = {}
-        snap = Snapshot(health=health, error=err, fetched_at=now, local=local)
-        if health is not None:
+        snap = snapshot(self.fetch, self.local, now)
+        if snap.health is not None:
             if self.snap is not None and self.snap.health is None:
                 log.info("proxy reachable again")
             self.last_ok = snap
         elif self.snap is None or self.snap.health is not None:
-            log.warning("proxy unreachable: %s", err)
+            log.warning("proxy unreachable: %s", snap.error)
         self.snap = snap
         self.policy.observe(problem_set(snap))
         self.next_poll = now + self.cfg.api.poll_interval_s

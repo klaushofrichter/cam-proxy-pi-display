@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from cam_proxy_pi_display.collector import Snapshot, fetch_health, is_problem, problem_set, valid_items
+from cam_proxy_pi_display.collector import Snapshot, fetch_health, is_problem, problem_set, snapshot, valid_items
 from tests.fixtures import load_fixture
 
 
@@ -136,3 +136,16 @@ def test_valid_items_skips_non_objects():
 def test_problem_set_ignores_non_objects_and_non_true_flags():
     h = {"items": ["camera", {"id": "disk", "problem": True}, {"id": "stream", "problem": "yes"}]}
     assert problem_set(Snapshot(health=h, error=None, fetched_at=0)) == frozenset({"disk"})
+
+
+def test_snapshot_takes_the_answer_and_the_local_figures():
+    s = snapshot(lambda: ({"items": []}, None), lambda: {"uptimeS": 5}, 12.5)
+    assert s == Snapshot(health={"items": []}, error=None, fetched_at=12.5, local={"uptimeS": 5})
+
+
+def test_snapshot_leaves_out_local_figures_that_fail():
+    def boom():
+        raise OSError("no /proc")
+
+    s = snapshot(lambda: (None, "timeout"), boom, 1.0)
+    assert s == Snapshot(health=None, error="timeout", fetched_at=1.0, local={})

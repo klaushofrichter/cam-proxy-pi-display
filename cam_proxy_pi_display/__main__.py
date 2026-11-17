@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import config as config_mod
 from . import fmt, localstats
-from .collector import Snapshot, fetch_health, parse_health
+from .collector import fetch_health, parse_health, snapshot
 from .fonts import Fonts
 from .panel import FakePanel
 from .render import RENDERERS, View, render
@@ -62,11 +62,10 @@ def make_panel(args):
 def once(args, cfg, fonts) -> int:
     now = time.time()
     if args.health_file:
-        health, err = parse_health(args.health_file.read_bytes())
+        snap = snapshot(lambda: parse_health(args.health_file.read_bytes()), localstats.read, now)
     else:
-        health, err = fetch_health(cfg.api.url, cfg.api.timeout_s)
-    snap = Snapshot(health=health, error=err, fetched_at=now, local=localstats.read())
-    img = render(args.once, View(snap, snap if health else None), fmt.local_time(now), fonts)
+        snap = snapshot(lambda: fetch_health(cfg.api.url, cfg.api.timeout_s), localstats.read, now)
+    img = render(args.once, View(snap, snap if snap.health else None), fmt.local_time(now), fonts)
     panel = make_panel(args)
     try:
         panel.show(img, label=args.once)

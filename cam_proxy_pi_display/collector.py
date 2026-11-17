@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import socket
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 SCHEMA = 1
 UNREACHABLE = "proxy-unreachable"
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -20,6 +24,17 @@ class Snapshot:
     error: str | None
     fetched_at: float  # unix seconds
     local: dict = field(default_factory=dict)  # localstats.read() at the same time
+
+
+def snapshot(fetch: Callable[[], tuple[dict | None, str | None]], local: Callable[[], dict], now: float) -> Snapshot:
+    """Ask the proxy (`fetch`) and read the Pi's own figures (`local`, optional: a failure leaves them out)."""
+    health, err = fetch()
+    try:
+        figures = local()
+    except Exception:  # noqa: BLE001 (local figures are optional)
+        log.exception("reading the local figures failed")
+        figures = {}
+    return Snapshot(health=health, error=err, fetched_at=now, local=figures)
 
 
 def fetch_health(url: str, timeout: float) -> tuple[dict | None, str | None]:
