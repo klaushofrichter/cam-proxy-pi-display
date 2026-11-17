@@ -14,7 +14,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw
 
 from . import fmt
-from .collector import Snapshot
+from .collector import Snapshot, is_problem, valid_items
 from .fonts import Fonts
 
 WIDTH, HEIGHT = 264, 176
@@ -136,7 +136,7 @@ class Canvas:
 
 
 def _items(health: dict) -> dict[str, dict]:
-    return {i.get("id"): i for i in health.get("items", []) if isinstance(i, dict)}
+    return {i.get("id"): i for i in valid_items(health)}
 
 
 def _thresholds(view: View) -> dict:
@@ -179,11 +179,6 @@ def _num(x) -> bool:
     return isinstance(x, (int, float)) and not isinstance(x, bool)
 
 
-def _flag(item: dict) -> bool:
-    """The API's problem flag (cam-proxy decides what is a problem)."""
-    return item.get("problem") is True
-
-
 def _pick(api: dict, loc: dict, key: str):
     """The API's figure, else the one read locally."""
     return api.get(key) if _num(api.get(key)) else loc.get(key)
@@ -191,7 +186,7 @@ def _pick(api: dict, loc: dict, key: str):
 
 def _api_problem(items: dict[str, dict], item_id: str, local_rule: bool) -> bool:
     """The API item's flag when there is one, else the local threshold rule."""
-    return _flag(items[item_id]) if item_id in items else local_rule
+    return is_problem(items[item_id]) if item_id in items else local_rule
 
 
 # --- pages -----------------------------------------------------------------------------
@@ -204,19 +199,19 @@ def _overview(c: Canvas, view: View, now: datetime) -> None:
         _local_rows(c, view, col=96)
         _summary(c, 1, view.changing_often)
         return
-    items = _fitting(c, [i for i in h.get("items", []) if isinstance(i, dict)])
+    items = _fitting(c, valid_items(h))
     # The text column starts after the widest label (labels are shown as the API gives them).
     widest = max((c.width(str(i.get("label", "")), c.regular) for i in items), default=0)
     col = int(min(132, MARGIN + widest + 8))
     for it in items:
-        label, text, problem = str(it.get("label", "")), str(it.get("text", "")), _flag(it)
+        label, text, problem = str(it.get("label", "")), str(it.get("text", "")), is_problem(it)
         if it.get("id") == "disk" and _num(it.get("value")):
             c.row(label, text, problem=problem, col=col, bar=(40, col - 8, float(it["value"])))
         else:
             c.row(label, text, problem=problem, col=col)
     count = h.get("problemCount")
     if not isinstance(count, int):
-        count = sum(1 for i in items if _flag(i))
+        count = sum(1 for i in items if is_problem(i))
     _summary(c, count, view.changing_often)
 
 
@@ -228,7 +223,7 @@ def _fitting(c: Canvas, items: list[dict]) -> list[dict]:
     for n in range(len(items) - 1, -1, -1):
         if len(gone) >= drop:
             break
-        if not _flag(items[n]):
+        if not is_problem(items[n]):
             gone.add(n)
     return [it for n, it in enumerate(items) if n not in gone][:rows]
 
@@ -284,7 +279,7 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
     if not cam.get("online") and cam.get("error"):
         state += f" ({cam['error']})"
     name = str(cam.get("name") or cam.get("id") or "Camera")
-    c.row(name, state, problem=_flag(cam_item), col=col)
+    c.row(name, state, problem=is_problem(cam_item), col=col)
     if _num(cam.get("since")):
         c.row("Since", _at(cam["since"], now), col=col)
     if cam.get("model"):
@@ -301,23 +296,23 @@ def _camera(c: Canvas, view: View, now: datetime) -> None:
     st = str(st_item.get("text", ""))
     if stream.get("enabled") and _num(stream.get("lastFrameAt")):
         st += f", frame {_at(stream['lastFrameAt'], now)}"
-    c.row("Stream", st, problem=_flag(st_item), col=col)
+    c.row("Stream", st, problem=is_problem(st_item), col=col)
 
     ev_item = it.get("events", {})
     ev = str(ev_item.get("text", events.get("onvif", "")))
     if _num(events.get("resubscribes")):
         n = int(events["resubscribes"])
         ev += f", {n} resubscribe{_s(n)}"
-    c.row("Events", ev, problem=_flag(ev_item), col=col)
+    c.row("Events", ev, problem=is_problem(ev_item), col=col)
 
     ftp_item = it.get("ftp", {})
     stalled = ftp.get("stalled") is True
     if ftp.get("enabled") is False:
-        c.row("FTP", str(ftp_item.get("text", "off in the proxy")), problem=_flag(ftp_item), col=col)
+        c.row("FTP", str(ftp_item.get("text", "off in the proxy")), problem=is_problem(ftp_item), col=col)
     else:
         upload = ftp.get("cameraUpload")
         text = str(ftp_item.get("text", "")) if not stalled else (str(upload) if upload else "")
-        c.row("FTP", text, problem=_flag(ftp_item) and not stalled, col=col)
+        c.row("FTP", text, problem=is_problem(ftp_item) and not stalled, col=col)
         if _num(ftp.get("lastClipAt")):
             c.row("Last clip", _at(ftp["lastClipAt"], now), col=col)
         if stalled:
@@ -357,7 +352,7 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
         c.row("FTP failures", str(int(ftp["failures"])), col=col)
     storage = it.get("storage")
     if storage:
-        c.row("Storage", str(storage.get("text", "")), problem=_flag(storage), col=col)
+        c.row("Storage", str(storage.get("text", "")), problem=is_problem(storage), col=col)
     cache = proxy.get("recordingsCache")
     if isinstance(cache, dict) and _num(cache.get("bytes")) and _num(cache.get("capBytes")):
         files = cache.get("files")
@@ -371,7 +366,7 @@ def _proxy(c: Canvas, view: View, now: datetime) -> None:
         c.row("Retention run", _at(proxy["lastRetentionRun"], now), col=col)
     inv = it.get("inventory")
     if inv:
-        c.row("Inventory", str(inv.get("text", "")), problem=_flag(inv), col=col)
+        c.row("Inventory", str(inv.get("text", "")), problem=is_problem(inv), col=col)
         last = proxy.get("lastInventory")
         if isinstance(last, dict) and _num(last.get("startedAt")):
             c.row("Inventory run", _at(last["startedAt"], now), col=col)
@@ -419,7 +414,7 @@ def _pi(c: Canvas, view: View, now: datetime) -> None:
 
     uv = it.get("underVoltage")
     if uv:
-        c.row("Under-voltage", str(uv.get("text", "")), problem=_flag(uv), col=col)
+        c.row("Under-voltage", str(uv.get("text", "")), problem=is_problem(uv), col=col)
 
     if loc.get("ip"):
         c.row("IP address", str(loc["ip"]), col=col)

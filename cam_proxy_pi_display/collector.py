@@ -66,10 +66,18 @@ def _reason(r) -> str:
     return str(r)[:40] or "error"
 
 
+def valid_items(health: dict) -> list[dict]:
+    """The answer's items, without entries that are not objects."""
+    return [i for i in health.get("items", []) if isinstance(i, dict)]
+
+
+def is_problem(item: dict) -> bool:
+    """The API's problem flag (cam-proxy decides what is a problem)."""
+    return item.get("problem") is True
+
+
 def problem_set(snap: Snapshot) -> frozenset[str]:
     """The ids of the items with problem: true; an unreachable proxy is a problem of its own."""
     if snap.health is None:
         return frozenset({UNREACHABLE})
-    return frozenset(
-        str(i.get("id")) for i in snap.health.get("items", []) if isinstance(i, dict) and i.get("problem") is True
-    )
+    return frozenset(str(i.get("id")) for i in valid_items(snap.health) if is_problem(i))

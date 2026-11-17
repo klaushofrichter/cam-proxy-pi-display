@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from cam_proxy_pi_display.collector import Snapshot, fetch_health, problem_set
+from cam_proxy_pi_display.collector import Snapshot, fetch_health, is_problem, problem_set, valid_items
 from tests.fixtures import load_fixture
 
 
@@ -119,3 +119,20 @@ def test_fetch_failure_reasons(monkeypatch, exc, reason):
 
     monkeypatch.setattr(urllib.request, "urlopen", boom)
     assert fetch_health("http://example.test/api/local/health", 1) == (None, reason)
+
+
+def test_is_problem_only_on_true():
+    assert is_problem({"problem": True})
+    assert not is_problem({"problem": "true"})
+    assert not is_problem({"problem": 1})
+    assert not is_problem({})
+
+
+def test_valid_items_skips_non_objects():
+    assert valid_items({"items": [{"id": "a"}, "x", None, 3, {"id": "b"}]}) == [{"id": "a"}, {"id": "b"}]
+    assert valid_items({}) == []
+
+
+def test_problem_set_ignores_non_objects_and_non_true_flags():
+    h = {"items": ["camera", {"id": "disk", "problem": True}, {"id": "stream", "problem": "yes"}]}
+    assert problem_set(Snapshot(health=h, error=None, fetched_at=0)) == frozenset({"disk"})
