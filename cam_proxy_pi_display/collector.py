@@ -94,6 +94,14 @@ def is_problem(item: dict) -> bool:
     return item.get("problem") is True
 
 
+def problem_count(health: dict) -> int:
+    """The answer's problemCount, else the number of items with problem: true (all of them, shown or not)."""
+    n = health.get("problemCount")
+    if isinstance(n, int) and not isinstance(n, bool) and n >= 0:
+        return n
+    return sum(1 for i in valid_items(health) if is_problem(i))
+
+
 def problem_set(snap: Snapshot) -> frozenset[str]:
     """The ids of the items with problem: true; an unreachable proxy is a problem of its own."""
     if snap.health is None:

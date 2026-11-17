@@ -8,6 +8,7 @@
 - A draw that fails no longer counts as shown: a problem the panel could not draw is tried again a minute later (it used to wait for the 15-minute timer, and the failed draw counted against the hourly limit of problem redraws).
 - A null text or label in cam-proxy's answer shows as empty (or the page's own fallback, such as the camera's online state) instead of the word "None".
 - The Camera page no longer has a "PoE switch" row: cam-proxy no longer sends the switch (it moved to cams-admin), so the row was never shown.
+- When cam-proxy's answer has no problem count, the Overview and the stopped page both count the flagged items, all of them: the stopped page used to say "All OK", and the Overview counted only the items that fit on the page.
 
 ## v2026.10.07.1
 

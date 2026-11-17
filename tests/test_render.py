@@ -14,7 +14,7 @@ from PIL import Image, ImageChops
 from cam_proxy_pi_display.collector import Snapshot
 from cam_proxy_pi_display.render import HEIGHT, WIDTH, View, compose, render
 from tests.fixtures import load_fixture
-from tests.scenarios import FETCHED, GOLDEN, LOCAL, NOW, view
+from tests.scenarios import FETCHED, GOLDEN, LOCAL, NOW, view, with_sd
 
 GOLDEN_DIR = Path(__file__).parent / "golden"
 # FreeType versions may move a few anti-aliasing-threshold pixels; a changed word moves hundreds.
@@ -266,7 +266,7 @@ def test_counts_are_singular_for_one(fonts):
 
 
 @pytest.mark.parametrize(
-    ("count", "state"), [(0, "All OK"), (1, "1 problem"), (2, "2 problems"), (None, "All OK"), ("x", "x problems")]
+    ("count", "state"), [(0, "All OK"), (1, "1 problem"), (2, "2 problems"), (None, "All OK"), ("x", "All OK")]
 )
 def test_stopped_page_summary(count, state, fonts):
     h = load_fixture("pi-ok")
@@ -331,3 +331,26 @@ def test_camera_page_has_no_poe_switch_row(fonts):
         h["camera"]["poeSwitch"] = poe
         ls = compose("camera", View(Snapshot(h, None, FETCHED, LOCAL)), NOW, fonts).lines
         assert "PoE switch" not in labels(ls)
+
+
+def _flag(h: dict, n: int) -> None:
+    """Flag the first n items and drop problemCount."""
+    del h["problemCount"]
+    for it in h["items"][:n]:
+        it["problem"] = True
+
+
+def test_without_problem_count_both_pages_count_the_flagged_items(fonts):
+    h = load_fixture("pi-ok")
+    _flag(h, 2)
+    v = View(Snapshot(h, None, FETCHED, LOCAL))
+    assert compose("overview", v, NOW, fonts).lines[-1] == ("2 problems", "", True)
+    assert compose("stopped", v, NOW, fonts).lines[-1] == ("Last data Sat Oct 3 10:25: 2 problems", "", False)
+
+
+def test_overview_counts_flagged_items_that_do_not_fit(fonts):
+    s = with_sd("pi-ok")  # 12 items, 10 rows
+    _flag(s.health, 12)
+    ls = compose("overview", View(s), NOW, fonts).lines
+    assert len(ls) == 12
+    assert ls[-1] == ("12 problems", "", True)

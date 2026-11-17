@@ -14,7 +14,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw
 
 from . import fmt
-from .collector import Snapshot, is_problem, valid_items
+from .collector import Snapshot, is_problem, problem_count, valid_items
 from .fonts import Fonts
 
 WIDTH, HEIGHT = 264, 176
@@ -243,10 +243,7 @@ def _overview(c: Canvas, view: View, now: datetime) -> None:
             c.row(label, text, problem=problem, col=col, bar=(40, col - 8, float(it["value"])))
         else:
             c.row(label, text, problem=problem, col=col)
-    count = h.get("problemCount")
-    if not isinstance(count, int):
-        count = sum(1 for i in items if is_problem(i))
-    _summary(c, count, view.changing_often)
+    _summary(c, problem_count(h), view.changing_often)
 
 
 def _fitting(c: Canvas, items: list[dict]) -> list[dict]:
@@ -450,7 +447,7 @@ def _stopped(c: Canvas, view: View, now: datetime) -> None:
     c.row("is not running.")
     snap = view.snap if view.snap.health is not None else view.last_ok
     if snap is not None and snap.health is not None:
-        state = _state(snap.health.get("problemCount", 0))
+        state = _state(problem_count(snap.health))
         c.footer(f"Last data {_fetched(snap, now)}: {state}", bold=False)
     else:
         c.footer("Last data: proxy unreachable", bold=False)
