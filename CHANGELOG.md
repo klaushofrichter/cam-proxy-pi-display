@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2026.11.23.1
+
 - When the daily 03:30 clear fails to reach the panel, it is tried again a minute later instead of being skipped until the next day.
 
 ## v2026.11.17.1
