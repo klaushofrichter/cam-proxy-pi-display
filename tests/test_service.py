@@ -154,6 +154,30 @@ def test_daily_clear_at_03_30(tmp_path, fonts):
     assert any("-clear" in p.name for p in (tmp_path / "out").iterdir())
 
 
+def test_a_failed_daily_clear_is_tried_again(tmp_path, fonts):
+    t0 = FETCHED + (16 * 60 + 35) * 60  # 03:00 local the next day: the clear comes at 03:30
+    svc, api, panel, clock = make(tmp_path, fonts, t0=t0)
+    tick(svc, clock, 30)  # up to 03:29
+    real_show, fails = panel.show, []
+
+    def fail_once(*a, **k):
+        if not fails and k.get("clear_first"):
+            fails.append(k.get("label"))
+            raise OSError("spi busy")
+        real_show(*a, **k)
+
+    panel.show = fail_once
+    svc.step()  # 03:30: the clear fails
+    assert fails == ["overview-clear"]
+    assert panel.clears == 0
+    clock.t += 1
+    svc.step()  # no retry storm: the next try comes a minute later
+    assert panel.clears == 0
+    clock.t += MIN
+    svc.step()
+    assert panel.clears == 1
+
+
 def test_long_press_overview(tmp_path, fonts):
     svc, api, panel, clock = make(tmp_path, fonts)
     svc.step()

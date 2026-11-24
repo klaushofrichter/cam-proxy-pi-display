@@ -84,7 +84,8 @@ class Service:
 
     # --- drawing -------------------------------------------------------------------------
 
-    def draw(self, page: str, reason: str, now: float, *, clear: bool = False) -> None:
+    def draw(self, page: str, reason: str, now: float, *, clear: bool = False) -> bool:
+        """Draw a page; True when it reached the panel."""
         assert self.snap is not None
         problems = problem_set(self.snap)
         view = View(self.snap, self.last_ok, self.policy.changing_often(now))
@@ -94,9 +95,10 @@ class Service:
         except Exception:  # noqa: BLE001 (keep running and the last image; tried again a minute later)
             log.exception("drawing %s (%s) failed", page, reason)
             self.policy.failed(now)
-        else:
-            log.info("drew %s (%s), problems: %s", page, reason, sorted(problems) or "none")
-            self.policy.drawn(page, problems, now, reason)
+            return False
+        log.info("drew %s (%s), problems: %s", page, reason, sorted(problems) or "none")
+        self.policy.drawn(page, problems, now, reason)
+        return True
 
     def key(self, action: str, now: float) -> None:
         page = self.policy.page if action == "update" else action
@@ -127,9 +129,9 @@ class Service:
             self.poll(now)
         local_now = self.local_time(now)
         due = self.policy.due(now)
-        if self.policy.clear_due(local_now):
-            self.draw(due.page if due else self.policy.page, "clear", now, clear=True)
-            self.policy.cleared(local_now)
+        if self.policy.clear_due(local_now) and not self.policy.backing_off(now):
+            if self.draw(due.page if due else self.policy.page, "clear", now, clear=True):
+                self.policy.cleared(local_now)  # a failed clear is tried again after the back-off
             return
         if due:
             self.draw(due.page, due.reason, now)

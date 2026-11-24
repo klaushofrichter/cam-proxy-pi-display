@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- When the daily 03:30 clear fails to reach the panel, it is tried again a minute later instead of being skipped until the next day.
+
 ## v2026.11.17.1
 
 - Internal cleanup, no change to the pages: one definition of a problem item and of a health snapshot, shared Pi rows, dead code removed. `--once` no longer stops with an error when the Pi's own figures can't be read; it draws without them, like the service. A `--fake-panel` run no longer keeps every drawn image in memory.

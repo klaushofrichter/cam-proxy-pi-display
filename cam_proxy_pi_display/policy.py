@@ -96,8 +96,12 @@ class RefreshPolicy:
         """A confirmed set of problems the panel doesn't show yet (and the latest poll agrees)."""
         return self.confirmed is not None and self.latest == self.confirmed and self.confirmed != self.shown
 
+    def backing_off(self, now: float) -> bool:
+        """A draw failed less than `RETRY_S` ago: nothing is tried yet."""
+        return self._failed_at is not None and now - self._failed_at < RETRY_S
+
     def due(self, now: float) -> Draw | None:
-        if self._failed_at is not None and now - self._failed_at < RETRY_S:
+        if self.backing_off(now):
             return None
         if self.last_draw_at is None:
             return Draw(OVERVIEW, "start")
